@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import ThemeToggle from './ThemeToggle';
-import { SearchIcon, MenuIcon, XIcon, UserIcon, LoginIcon, LogoutIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, Bars3Icon, XMarkIcon, UserIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon } from '@heroicons/react/24/outline';
 import { useTheme } from 'next-themes';
 import { useAuth } from './AuthContext';
 
@@ -55,7 +55,7 @@ const NavBar: React.FC<NavBarProps> = ({ onToggleSidebar, isSidebarOpen, isMobil
                 className="mr-2 p-1 rounded-md text-text-primary hover:bg-surface-hover focus:outline-none"
                 aria-label="Toggle sidebar"
               >
-                <MenuIcon className="h-6 w-6" />
+                <Bars3Icon className="h-6 w-6" />
               </button>
             )}
             <Link href="/" className="flex items-center">
@@ -110,7 +110,7 @@ const NavBar: React.FC<NavBarProps> = ({ onToggleSidebar, isSidebarOpen, isMobil
                   placeholder="Search notes..."
                   className="w-64 pl-10 pr-4 py-2 rounded-md bg-background-secondary text-text-primary placeholder-text-tertiary border border-border focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
-                <SearchIcon className="h-5 w-5 text-text-tertiary absolute left-3 top-1/2 transform -translate-y-1/2" />
+                <MagnifyingGlassIcon className="h-5 w-5 text-text-tertiary absolute left-3 top-1/2 transform -translate-y-1/2" />
               </div>
             </form>
 
@@ -150,7 +150,7 @@ const NavBar: React.FC<NavBarProps> = ({ onToggleSidebar, isSidebarOpen, isMobil
                         className="w-full text-left block px-4 py-2 text-sm text-text-primary hover:bg-surface-hover"
                       >
                         <div className="flex items-center">
-                          <LogoutIcon className="mr-2 h-4 w-4" />
+                          <ArrowRightOnRectangleIcon className="mr-2 h-4 w-4" />
                           Sign out
                         </div>
                       </button>
@@ -162,7 +162,7 @@ const NavBar: React.FC<NavBarProps> = ({ onToggleSidebar, isSidebarOpen, isMobil
                   href="/login"
                   className="flex items-center text-text-primary hover:text-primary transition-colors"
                 >
-                  <LoginIcon className="h-5 w-5 mr-1" />
+                  <ArrowRightOnRectangleIcon className="h-5 w-5 mr-1" />
                   <span>Sign in</span>
                 </Link>
               )}
@@ -177,9 +177,9 @@ const NavBar: React.FC<NavBarProps> = ({ onToggleSidebar, isSidebarOpen, isMobil
               className="ml-2 p-2 rounded-md text-text-primary hover:bg-surface-hover focus:outline-none"
             >
               {isMobileMenuOpen ? (
-                <XIcon className="h-6 w-6" />
+                <XMarkIcon className="h-6 w-6" />
               ) : (
-                <MenuIcon className="h-6 w-6" />
+                <Bars3Icon className="h-6 w-6" />
               )}
             </button>
           </div>
@@ -200,7 +200,7 @@ const NavBar: React.FC<NavBarProps> = ({ onToggleSidebar, isSidebarOpen, isMobil
                   placeholder="Search notes..."
                   className="w-full pl-10 pr-4 py-2 rounded-md bg-background-tertiary text-text-primary placeholder-text-tertiary border border-border focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
-                <SearchIcon className="h-5 w-5 text-text-tertiary absolute left-3 top-1/2 transform -translate-y-1/2" />
+                <MagnifyingGlassIcon className="h-5 w-5 text-text-tertiary absolute left-3 top-1/2 transform -translate-y-1/2" />
               </div>
             </form>
 
