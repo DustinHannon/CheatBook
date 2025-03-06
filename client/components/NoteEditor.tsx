@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Editor, EditorState, RichUtils, ContentState, convertToRaw, convertFromRaw, SelectionState, Modifier } from 'draft-js';
+import { Editor, EditorState, RichUtils, ContentState, convertToRaw, convertFromRaw, SelectionState, Modifier, ContentBlock } from 'draft-js';
 import 'draft-js/dist/Draft.css';
 import { 
   ArrowDownTrayIcon,
@@ -401,7 +401,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     try {
       const contentState = editorState.getCurrentContent();
       const blockMap = contentState.getBlockMap();
-      let targetBlock, targetOffset;
+      let targetBlock: ContentBlock | undefined;
+      let targetOffset: number | undefined;
       
       // This is a simplified approach - real implementation depends on your Draft.js setup
       // Find the block and offset for the target position
