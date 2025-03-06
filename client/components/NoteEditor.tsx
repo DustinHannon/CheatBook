@@ -553,10 +553,10 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   };
 
   // Handle image paste
-  const handlePaste = (text: string, html: string, editorState: EditorState) => {
+  const handlePaste = (text: string, html: string | undefined, editorState: EditorState) => {
     // We could implement image paste handling here
     // For now, we'll just use the default paste behavior
-    return false;
+    return 'not-handled';
   };
 
   // Handle image upload
