@@ -33,8 +33,10 @@ interface NotesListProps {
   notebooks: NotebookType[];
   notes: NoteType[];
   selectedNoteId?: string;
+  selectedNotebookId?: string;
   onCreateNote: () => void;
   onCreateNotebook: () => void;
+  onSelectNotebook?: (notebookId: string) => void;
 }
 
 /**
@@ -45,8 +47,10 @@ const NotesList: React.FC<NotesListProps> = ({
   notebooks,
   notes,
   selectedNoteId,
+  selectedNotebookId,
   onCreateNote,
   onCreateNotebook,
+  onSelectNotebook,
 }) => {
   const router = useRouter();
   const [expandedNotebooks, setExpandedNotebooks] = useState<{ [key: string]: boolean }>({});
@@ -174,8 +178,15 @@ const NotesList: React.FC<NotesListProps> = ({
           {notebooks.map(notebook => (
             <div key={notebook.id}>
               <div 
-                className="flex items-center px-4 py-2 cursor-pointer hover:bg-surface-hover"
-                onClick={() => toggleNotebook(notebook.id)}
+                className={`flex items-center px-4 py-2 cursor-pointer hover:bg-surface-hover ${
+                  selectedNotebookId === notebook.id ? 'bg-surface-active' : ''
+                }`}
+                onClick={() => {
+                  toggleNotebook(notebook.id);
+                  if (onSelectNotebook) {
+                    onSelectNotebook(notebook.id);
+                  }
+                }}
               >
                 {expandedNotebooks[notebook.id] ? (
                   <ChevronDownIcon className="h-4 w-4 text-text-secondary mr-2" />
@@ -255,4 +266,4 @@ const NotesList: React.FC<NotesListProps> = ({
   );
 };
 
-export default NotesList; 
+export default NotesList;

@@ -10,8 +10,10 @@ interface LayoutProps {
   notebooks?: any[];
   notes?: any[];
   selectedNoteId?: string;
+  selectedNotebookId?: string;
   onCreateNote?: () => void;
   onCreateNotebook?: () => void;
+  onSelectNotebook?: (notebookId: string) => void;
 }
 
 /**
@@ -24,8 +26,10 @@ const Layout: React.FC<LayoutProps> = ({
   notebooks = [],
   notes = [],
   selectedNoteId,
+  selectedNotebookId,
   onCreateNote,
   onCreateNotebook,
+  onSelectNotebook,
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileView, setIsMobileView] = useState(false);
@@ -96,8 +100,10 @@ const Layout: React.FC<LayoutProps> = ({
                 notebooks={notebooks}
                 notes={notes}
                 selectedNoteId={selectedNoteId}
+                selectedNotebookId={selectedNotebookId}
                 onCreateNote={onCreateNote || defaultCreateNote}
                 onCreateNotebook={onCreateNotebook || defaultCreateNotebook}
+                onSelectNotebook={onSelectNotebook}
               />
             </div>
           </div>
@@ -112,4 +118,4 @@ const Layout: React.FC<LayoutProps> = ({
   );
 };
 
-export default Layout; 
+export default Layout;
