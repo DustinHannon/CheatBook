@@ -118,4 +118,4 @@ function initializeDatabase() {
 module.exports = {
   db,
   initializeDatabase
-}; 
+};

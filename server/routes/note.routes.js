@@ -17,7 +17,8 @@ const router = express.Router();
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../uploads');
+    // Use a specific directory for note images
+    const uploadDir = path.join(__dirname, '../uploads/images');
     
     // Create directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
@@ -512,7 +513,8 @@ router.delete('/:noteId', async (req, res) => {
                 if (images && images.length > 0) {
                   for (const image of images) {
                     try {
-                      const filePath = path.join(__dirname, '../uploads', path.basename(image.file_path));
+                      const imageFilename = path.basename(image.file_path);
+                      const filePath = path.join(__dirname, '../uploads/images', imageFilename);
                       if (fs.existsSync(filePath)) {
                         fs.unlinkSync(filePath);
                       }
@@ -578,7 +580,7 @@ router.post('/:noteId/images', upload.single('image'), async (req, res) => {
         
         // Save image information in database
         const id = uuidv4();
-        const filePath = `/uploads/${path.basename(req.file.path)}`;
+        const filePath = `/uploads/images/${path.basename(req.file.path)}`;
         
         db.run(
           'INSERT INTO images (id, note_id, file_path, file_name, mime_type, size) VALUES (?, ?, ?, ?, ?, ?)',
@@ -669,4 +671,4 @@ router.get('/search', async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;

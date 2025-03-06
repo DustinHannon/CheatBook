@@ -177,16 +177,14 @@ router.post('/avatar', upload.single('avatar'), async (req, res) => {
             
             // Delete old avatar if exists
             if (user && user.avatar) {
-              try {
-                const oldAvatarPath = path.join(
-                  __dirname, 
-                  '..',
-                  user.avatar.replace(/^\/uploads\//, 'uploads/')
-                );
-                
-                if (fs.existsSync(oldAvatarPath)) {
-                  fs.unlinkSync(oldAvatarPath);
-                }
+                try {
+                  // Get the base filename from the avatar path
+                  const avatarFilename = path.basename(user.avatar);
+                  const oldAvatarPath = path.join(__dirname, '../uploads/avatars', avatarFilename);
+                  
+                  if (fs.existsSync(oldAvatarPath)) {
+                    fs.unlinkSync(oldAvatarPath);
+                  }
               } catch (deleteError) {
                 console.error('Error deleting old avatar:', deleteError);
                 // Continue anyway
@@ -272,4 +270,4 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;

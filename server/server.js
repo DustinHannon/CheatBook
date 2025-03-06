@@ -7,6 +7,7 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 const socketIO = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
@@ -43,8 +44,14 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // Static file serving for uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(uploadsDir));
 
 // Initialize database
 initializeDatabase();
@@ -61,15 +68,27 @@ app.use('/api/users', authenticateJWT, userRoutes);
 
 // For production deployment, serve Next.js static files
 if (process.env.NODE_ENV === 'production') {
+  // Check if the 'out' directory exists, if not use 'build'
+  const clientDir = fs.existsSync(path.join(__dirname, '../client/out')) 
+    ? path.join(__dirname, '../client/out') 
+    : path.join(__dirname, '../client/.next');
+  
   // Serve static files from the Next.js build
-  app.use(express.static(path.join(__dirname, '../client/out')));
+  app.use(express.static(clientDir));
   
   // Handle all other routes, let Next.js handle routing
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) {
       return next();
     }
-    res.sendFile(path.join(__dirname, '../client/out/index.html'));
+    
+    const indexPath = path.join(clientDir, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      // For .next directory, let's use a middleware that renders the page
+      res.status(404).send('Page not found. Make sure to build the Next.js app first.');
+    }
   });
 }
 
@@ -92,4 +111,4 @@ server.listen(PORT, () => {
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-module.exports = { app, server, io }; 
+module.exports = { app, server, io };
