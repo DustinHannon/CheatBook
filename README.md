@@ -124,10 +124,6 @@ The backend provides RESTful API endpoints for:
 
 ## Real-Time Collaboration: How It Works
 
-### Explain Like I'm Five
-
-Imagine you're drawing with your friends on a magical whiteboard. When you draw something, everyone can see it right away! That's how CheatBook's real-time collaboration works.
-
 #### How it works:
 1. When you open a note, your computer connects to our special message center (Socket.IO)
 2. As you type or add pictures, your computer sends tiny messages to the message center
