@@ -6,11 +6,18 @@ import { SearchIcon, MenuIcon, XIcon, UserIcon, LoginIcon, LogoutIcon } from '@h
 import { useTheme } from 'next-themes';
 import { useAuth } from './AuthContext';
 
+// Define props interface
+interface NavBarProps {
+  onToggleSidebar?: () => void;
+  isSidebarOpen?: boolean;
+  isMobileView?: boolean;
+}
+
 /**
  * NavBar Component
  * Top navigation bar with app name, search bar, and theme toggle
  */
-const NavBar: React.FC = () => {
+const NavBar: React.FC<NavBarProps> = ({ onToggleSidebar, isSidebarOpen, isMobileView }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
@@ -42,6 +49,15 @@ const NavBar: React.FC = () => {
         <div className="flex justify-between items-center h-header">
           {/* Logo and App Name */}
           <div className="flex items-center">
+            {isMobileView && (
+              <button
+                onClick={onToggleSidebar}
+                className="mr-2 p-1 rounded-md text-text-primary hover:bg-surface-hover focus:outline-none"
+                aria-label="Toggle sidebar"
+              >
+                <MenuIcon className="h-6 w-6" />
+              </button>
+            )}
             <Link href="/" className="flex items-center">
               <svg 
                 className="h-8 w-8 text-primary" 
