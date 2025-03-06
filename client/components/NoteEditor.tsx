@@ -408,8 +408,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       // Find the block and offset for the target position
       let currentPosition = 0;
       
-      // Using BlockMap forEach method instead of Array.from to avoid typing issues
-      blockMap.forEach((block: ContentBlock, key: string) => {
+      // Using BlockMap forEach method with proper type handling
+      blockMap.forEach((block: ContentBlock | undefined, key?: string) => {
         if (block && !targetBlock && currentPosition + block.getLength() >= position) {
           targetBlock = block;
           targetOffset = position - currentPosition;
