@@ -1,5 +1,4 @@
-import React, { useMemo } from 'react';
-import { Tooltip } from '@headlessui/react';
+import React, { useMemo, useState } from 'react';
 
 interface User {
   id: string;
@@ -59,41 +58,47 @@ const UserPresence: React.FC<UserPresenceProps> = ({
     }
   }, [size]);
 
+  const [showTooltip, setShowTooltip] = useState(false);
+  
   return (
-    <div className="relative mr-1 last:mr-0">
-      <Tooltip>
-        <Tooltip.Button className="focus:outline-none">
-          <div className={`${dimensions.outer} rounded-full flex items-center justify-center relative`}>
-            {/* Status indicator dot */}
-            <div 
-              className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-background-primary ${
-                isActive ? 'bg-success' : 'bg-gray-400'
-              }`}
-            />
-            
-            {/* User avatar circle */}
-            <div 
-              className={`${dimensions.inner} rounded-full flex items-center justify-center`} 
-              style={{ backgroundColor: user.color }}
-            >
-              <span className={`${dimensions.text} font-medium text-white`}>
-                {initial}
-              </span>
-            </div>
+    <div 
+      className="relative mr-1 last:mr-0"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <div className="focus:outline-none">
+        <div className={`${dimensions.outer} rounded-full flex items-center justify-center relative`}>
+          {/* Status indicator dot */}
+          <div 
+            className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-background-primary ${
+              isActive ? 'bg-success' : 'bg-gray-400'
+            }`}
+          />
+          
+          {/* User avatar circle */}
+          <div 
+            className={`${dimensions.inner} rounded-full flex items-center justify-center`} 
+            style={{ backgroundColor: user.color }}
+          >
+            <span className={`${dimensions.text} font-medium text-white`}>
+              {initial}
+            </span>
           </div>
-        </Tooltip.Button>
-        
-        <Tooltip.Panel className="absolute z-10 bg-surface shadow-lg rounded p-2 text-sm text-text-primary">
+        </div>
+      </div>
+      
+      {showTooltip && (
+        <div className="absolute z-10 bg-surface shadow-lg rounded p-2 text-sm text-text-primary -translate-x-1/2 left-1/2 mt-1">
           <div className="flex flex-col items-center">
             <span>{user.name}</span>
             <span className="text-xs text-text-tertiary">
               {isActive ? 'Currently editing' : 'Last active: ' + new Date(user.last_active).toLocaleTimeString()}
             </span>
           </div>
-        </Tooltip.Panel>
-      </Tooltip>
+        </div>
+      )}
     </div>
   );
 };
 
-export default UserPresence; 
+export default UserPresence;
