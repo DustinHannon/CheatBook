@@ -65,7 +65,10 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/out')));
   
   // Handle all other routes, let Next.js handle routing
-  app.get('*', (req, res) => {
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
     res.sendFile(path.join(__dirname, '../client/out/index.html'));
   });
 }

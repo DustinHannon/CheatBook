@@ -2,10 +2,12 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  output: 'export',
   images: {
     domains: ['localhost'],
     // This allows images to be served from the same domain as the app
     // You should add your Azure Web App domain here when deployed
+    unoptimized: true,
   },
   // This is important for handling image uploads and real-time functionality
   // in development mode
