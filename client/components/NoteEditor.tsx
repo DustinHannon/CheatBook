@@ -407,12 +407,16 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       // This is a simplified approach - real implementation depends on your Draft.js setup
       // Find the block and offset for the target position
       let currentPosition = 0;
-      blockMap.forEach((block) => {
-        if (!targetBlock && currentPosition + block.getLength() >= position) {
+      
+      // Using BlockMap forEach method instead of Array.from to avoid typing issues
+      blockMap.forEach((block: ContentBlock, key: string) => {
+        if (block && !targetBlock && currentPosition + block.getLength() >= position) {
           targetBlock = block;
           targetOffset = position - currentPosition;
         }
-        currentPosition += block.getLength() + 1; // +1 for newline
+        if (block) {
+          currentPosition += block.getLength() + 1; // +1 for newline
+        }
       });
       
       if (targetBlock && targetOffset !== undefined) {
