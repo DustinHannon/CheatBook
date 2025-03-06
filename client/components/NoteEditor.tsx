@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Editor, EditorState, RichUtils, ContentState, convertToRaw, convertFromRaw, SelectionState, Modifier } from 'draft-js';
 import 'draft-js/dist/Draft.css';
 import { 
-  SaveIcon,
+  ArrowDownTrayIcon,
   CheckIcon,
   ExclamationCircleIcon,
   DocumentDuplicateIcon, 
@@ -730,7 +730,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
             )}
             {saveStatus === 'saving' && (
               <span className="text-yellow-500 flex items-center">
-                <SaveIcon className="h-4 w-4 mr-1 animate-pulse" />
+                <ArrowDownTrayIcon className="h-4 w-4 mr-1 animate-pulse" />
                 Saving...
               </span>
             )}
@@ -832,4 +832,4 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   );
 };
 
-export default NoteEditor; 
+export default NoteEditor;
