@@ -66,29 +66,133 @@ app.use('/api/auth', authRoutes);
 app.use('/api/notes', authenticateJWT, noteRoutes);
 app.use('/api/users', authenticateJWT, userRoutes);
 
-// For production deployment, serve Next.js static files
-if (process.env.NODE_ENV === 'production') {
-  // Check if the 'out' directory exists, if not use 'build'
-  const clientDir = fs.existsSync(path.join(__dirname, '../client/out')) 
-    ? path.join(__dirname, '../client/out') 
-    : path.join(__dirname, '../client/.next');
+// Serve Next.js static files (for both development and production)
+// Next.js with output: 'export' creates static HTML in the 'out' directory
+const clientOutDir = path.join(__dirname, '../client/out');
+const clientNextDir = path.join(__dirname, '../client/.next');
+const loginPath = '/login';
+
+// Function to check if a request path should be public (accessible without auth)
+const isPublicPath = (path) => {
+  // Always allow API routes through, they handle their own auth
+  if (path.startsWith('/api')) return true;
+  
+  // Public paths that don't require authentication
+  return path === loginPath || 
+         path.startsWith('/_next/') || 
+         path.startsWith('/static/') ||
+         path.endsWith('.js') ||
+         path.endsWith('.css') ||
+         path.endsWith('.ico') ||
+         path.endsWith('.png') ||
+         path.endsWith('.jpg') ||
+         path.endsWith('.svg');
+};
+
+// Check if the client has been built
+if (fs.existsSync(clientOutDir)) {
+  console.log('Serving Next.js static files from out directory');
   
   // Serve static files from the Next.js build
-  app.use(express.static(clientDir));
+  app.use(express.static(clientOutDir));
   
-  // Handle all other routes, let Next.js handle routing
+  // Handle all routes
   app.get('*', (req, res, next) => {
+    // Let the API routes pass through to their handlers
     if (req.path.startsWith('/api')) {
       return next();
     }
     
-    const indexPath = path.join(clientDir, 'index.html');
-    if (fs.existsSync(indexPath)) {
+    // For non-public paths, check for authentication
+    if (!isPublicPath(req.path)) {
+      // Skip auth check if user has a token (let client-side code handle it)
+      if (!req.cookies.token) {
+        // For the homepage specifically, which is protected
+        if (req.path === '/') {
+          console.log(`Serving error.html for unauthenticated homepage request`);
+          // Show our custom error page
+          const errorHtmlPath = path.join(clientOutDir, 'error.html');
+          if (fs.existsSync(errorHtmlPath)) {
+            return res.sendFile(errorHtmlPath);
+          } else {
+            // If error.html doesn't exist, redirect to login
+            console.log(`Error.html not found, redirecting to login`);
+            return res.redirect(loginPath);
+          }
+        }
+        
+        // For other protected paths, redirect to login
+        console.log(`Redirecting unauthenticated request from ${req.path} to login`);
+        return res.redirect(loginPath);
+      }
+      
+      // If the path is root and we got here, the user has a token
+      // We'll let the client-side code handle authentication validation
+    }
+    
+    // Special case for favicon that doesn't exist
+    if (req.path === '/favicon.ico') {
+      return res.status(204).end(); // No content for favicon
+    }
+    
+    // For the login page or authenticated users, serve the appropriate file
+    let pagePath;
+    
+    // Handle route-specific paths
+    if (req.path === '/' || req.path === '/login') {
+      pagePath = path.join(clientOutDir, req.path === '/' ? 'index.html' : 'login.html');
+    } else if (!req.path.includes('.')) {
+      // For other routes without extensions
+      pagePath = path.join(clientOutDir, req.path, 'index.html');
+    } else {
+      // For static assets
+      pagePath = path.join(clientOutDir, req.path);
+    }
+    
+    // Check for .next specific files
+    if (req.path.startsWith('/_next/')) {
+      pagePath = path.join(clientOutDir, req.path);
+    }
+    
+    // Fallback to index.html
+    const indexPath = path.join(clientOutDir, 'index.html');
+    const loginHtmlPath = path.join(clientOutDir, 'login.html');
+    
+    console.log(`Attempt to serve: ${pagePath}`);
+    
+    if (fs.existsSync(pagePath)) {
+      console.log(`Serving file: ${pagePath}`);
+      res.sendFile(pagePath);
+    } else if (req.path === '/login' && fs.existsSync(loginHtmlPath)) {
+      console.log(`Serving login page: ${loginHtmlPath}`);
+      res.sendFile(loginHtmlPath);
+    } else if (fs.existsSync(indexPath)) {
+      console.log(`Serving fallback index: ${indexPath}`);
       res.sendFile(indexPath);
     } else {
-      // For .next directory, let's use a middleware that renders the page
-      res.status(404).send('Page not found. Make sure to build the Next.js app first.');
+      console.log(`File not found: ${pagePath}`);
+      res.status(404).send('Page not found. Make sure the Next.js app has been built with "npm run build".');
     }
+  });
+} else if (fs.existsSync(clientNextDir)) {
+  console.log('Serving Next.js from .next directory');
+  app.use(express.static(clientNextDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    if (!isPublicPath(req.path) && !req.cookies.token) {
+      return res.redirect(loginPath);
+    }
+    res.status(200).send('Next.js server is configured to use output: "export". Run "npm run build" to generate static files.');
+  });
+} else {
+  console.log('No Next.js build found. API endpoints will still work.');
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.status(404).send('Next.js build not found. Run "npm run build" to build the client.');
   });
 }
 

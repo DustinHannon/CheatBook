@@ -30,14 +30,23 @@ const AuthContext = createContext<AuthContextType>({
   setError: () => {},
 });
 
+// Determine if we're running on the client side
+const isClient = typeof window !== 'undefined';
+
 // Auth provider component
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if user is authenticated on mount
+  // Check if user is authenticated on mount (client-side only)
   useEffect(() => {
+    // Skip authentication check during server-side rendering
+    if (!isClient) {
+      setIsLoading(false);
+      return;
+    }
+
     const checkAuthStatus = async () => {
       try {
         const response = await fetch('/api/auth/me', {
@@ -50,6 +59,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       } catch (err) {
         console.error('Auth check failed:', err);
+        // Don't set error state here as it's just an initial check
       } finally {
         setIsLoading(false);
       }
@@ -61,6 +71,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Request login code
   const login = async (email: string) => {
     setError(null);
+    setIsLoading(true);
+    
     try {
       const response = await fetch('/api/auth/request-code', {
         method: 'POST',
@@ -79,12 +91,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       throw err;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Verify login code
   const verifyCode = async (email: string, code: string): Promise<boolean> => {
     setError(null);
+    setIsLoading(true);
+    
     try {
       const response = await fetch('/api/auth/verify-code', {
         method: 'POST',
@@ -107,6 +123,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 

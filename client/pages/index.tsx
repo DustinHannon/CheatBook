@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Layout from '../components/Layout';
 import NoteEditor from '../components/NoteEditor';
 import ImagePaste from '../components/ImagePaste';
+import ProtectedRoute from '../components/ProtectedRoute';
 
 // Sample data for demonstration
 const SAMPLE_NOTEBOOKS = [
@@ -306,11 +307,12 @@ export default function Home() {
   };
   
   return (
-    <Layout 
-      notebooks={notebooks}
-      selectedNotebookId={selectedNotebook?.id}
-      onSelectNotebook={handleSelectNotebook}
-    >
+    <ProtectedRoute>
+      <Layout 
+        notebooks={notebooks}
+        selectedNotebookId={selectedNotebook?.id}
+        onSelectNotebook={handleSelectNotebook}
+      >
       <Head>
         <title>CheatBook - Your Collaborative Notes</title>
         <meta name="description" content="A real-time multi-user note-taking web app" />
@@ -390,6 +392,7 @@ export default function Home() {
           )}
         </div>
       </main>
-    </Layout>
+      </Layout>
+    </ProtectedRoute>
   );
-} 
+}
