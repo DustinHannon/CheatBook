@@ -13,7 +13,10 @@
     "build": "cd client && npm install && npm run build",
     "start": "node server/server.js",
     "install:all": "npm install && cd client && npm install",
-    "test": "echo \"No tests configured\" && exit 0"
+    "test": "jest",
+    "test:server": "jest --testPathPattern=server/",
+    "test:client": "jest --testPathPattern=client/",
+    "lint": "eslint ."
   },
   "keywords": [
     "note-taking",
@@ -27,22 +30,35 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@azure/storage-blob": "^12.17.0",
     "@types/react": "^19.0.12",
     "bcrypt": "^5.1.1",
+    "compression": "^1.7.4",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "lodash.debounce": "^4.0.8",
+    "lodash.throttle": "^4.1.1",
     "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.6.5",
     "nodemailer": "^6.9.8",
+    "pg": "^8.11.3",
     "socket.io": "^4.7.2",
     "sqlite3": "^5.1.6",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^4.7.1"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "nodemon": "^3.0.2"
+    "eslint": "^8.55.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2",
+    "supertest": "^6.3.3"
   }
 }

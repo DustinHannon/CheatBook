@@ -1,100 +1,65 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { useSocket } from './SocketContext';
 
 interface ImagePasteProps {
-  onImagePaste: (file: File, cursorPosition: number) => Promise<void>;
-  disabled?: boolean;
   children: React.ReactNode;
-  cursorPosition?: number;
+  onImagePaste?: (file: File, cursorPosition: number) => Promise<void>;
+  cursorPosition: number;
 }
 
 /**
  * ImagePaste Component
- * Wrapper component that captures paste events with images
- * and provides the image data to a callback function
+ * Handles image paste events and passes them to the editor
  */
-const ImagePaste: React.FC<ImagePasteProps> = ({ 
-  onImagePaste, 
-  disabled = false, 
+const ImagePaste: React.FC<ImagePasteProps> = ({
   children,
-  cursorPosition = 0
+  onImagePaste,
+  cursorPosition,
 }) => {
-  const [isPasting, setIsPasting] = useState(false);
-
+  const { socket, isConnected } = useSocket();
+  
+  // Handle paste events
   const handlePaste = useCallback(
-    async (e: ClipboardEvent) => {
-      if (disabled || isPasting) return;
+    async (event: ClipboardEvent) => {
+      // Check if we have clipboard data and if there's an image
+      const items = event.clipboardData?.items;
+      if (!items || !onImagePaste) return;
 
-      const items = e.clipboardData?.items;
-      if (!items) return;
-
-      // Look for image items in the clipboard
+      // Look for images in the pasted content
       for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf('image') === 0) {
-          e.preventDefault();
-          const file = items[i].getAsFile();
+        const item = items[i];
+        
+        // Check if the item is an image
+        if (item.type.indexOf('image') === 0) {
+          // Get the image file
+          const file = item.getAsFile();
+          if (!file) continue;
           
-          if (file) {
-            try {
-              setIsPasting(true);
-              // Pass cursor position for collaborative editing
-              await onImagePaste(file, cursorPosition);
-            } catch (error) {
-              console.error('Error pasting image:', error);
-            } finally {
-              setIsPasting(false);
-            }
+          // Process file
+          try {
+            await onImagePaste(file, cursorPosition);
+          } catch (error) {
+            console.error('Error processing pasted image:', error);
           }
+          
+          // Prevent default behavior to avoid double paste
+          event.preventDefault();
           break;
         }
       }
     },
-    [disabled, isPasting, onImagePaste, cursorPosition]
+    [onImagePaste, cursorPosition]
   );
 
+  // Add and remove the paste event listener
   useEffect(() => {
-    // Add and remove the paste event listener
     document.addEventListener('paste', handlePaste);
     return () => {
       document.removeEventListener('paste', handlePaste);
     };
   }, [handlePaste]);
 
-  return (
-    <div className="relative w-full h-full">
-      {children}
-      
-      {/* Overlay when pasting */}
-      {isPasting && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded-lg shadow-lg">
-            <div className="flex items-center space-x-2">
-              <svg 
-                className="animate-spin h-5 w-5 text-primary" 
-                xmlns="http://www.w3.org/2000/svg" 
-                fill="none" 
-                viewBox="0 0 24 24"
-              >
-                <circle 
-                  className="opacity-25" 
-                  cx="12" 
-                  cy="12" 
-                  r="10" 
-                  stroke="currentColor" 
-                  strokeWidth="4"
-                />
-                <path 
-                  className="opacity-75" 
-                  fill="currentColor" 
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              <span className="text-text-primary">Uploading image...</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  return <>{children}</>;
 };
 
-export default ImagePaste; 
+export default ImagePaste;

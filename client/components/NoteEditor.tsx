@@ -10,7 +10,7 @@ import {
   TrashIcon
 } from '@heroicons/react/24/outline';
 import UserPresence from './UserPresence';
-import { io, Socket } from 'socket.io-client';
+import { useSocket } from './SocketContext';
 
 // Type definitions
 interface NoteType {
@@ -67,57 +67,39 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'unsaved' | 'saving' | 'saved' | 'error'>('saved');
   const [saveTimer, setSaveTimer] = useState<NodeJS.Timeout | null>(null);
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [docVersion, setDocVersion] = useState(1);
-  const [isConnected, setIsConnected] = useState(false);
   const [localChanges, setLocalChanges] = useState(false);
   const [typingUsers, setTypingUsers] = useState<ActiveUser[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [imageUploads, setImageUploads] = useState<Record<string, any>>({});
+  
+  // Use the socket context
+  const { socket, isConnected } = useSocket();
+  
   const editorRef = useRef<Editor>(null);
   const lastCursorPosition = useRef<number | null>(null);
   const lastSelectionState = useRef<SelectionState | null>(null);
   const throttleRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Initialize Socket.IO connection
+  // Set up socket event listeners
   useEffect(() => {
-    if (!userToken || !note?.id) return;
+    if (!socket || !note?.id) return;
     
-    // Connect to Socket.IO server
-    const socketInstance = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000', {
-      auth: {
-        token: userToken
-      }
-    });
+    console.log('Setting up socket event listeners for note:', note.id);
     
-    socketInstance.on('connect', () => {
-      console.log('Socket connected');
-      setIsConnected(true);
-      
-      // Join the note's room
-      socketInstance.emit('join-note', note.id);
-    });
-    
-    socketInstance.on('disconnect', () => {
-      console.log('Socket disconnected');
-      setIsConnected(false);
-    });
-    
-    socketInstance.on('connect_error', (error) => {
-      console.error('Socket connection error:', error);
-      setIsConnected(false);
-    });
+    // Join the note's room
+    socket.emit('join-note', note.id);
     
     // Listen for note version info
-    socketInstance.on('note-version', (data) => {
+    socket.on('note-version', (data) => {
       if (data.noteId === note.id) {
         setDocVersion(data.version);
       }
     });
     
     // Listen for note updates from other users
-    socketInstance.on('note-updated', (data) => {
-      if (data.noteId === note.id && data.userId !== socketInstance.id) {
+    socket.on('note-updated', (data) => {
+      if (data.noteId === note.id && data.userId !== socket.id) {
         try {
           // Update document version
           setDocVersion(data.version);
@@ -152,7 +134,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     });
     
     // Listen for version conflicts
-    socketInstance.on('version-conflict', (data) => {
+    socket.on('version-conflict', (data) => {
       if (data.noteId === note.id) {
         // Update with the latest content from the server
         try {
@@ -169,7 +151,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     });
     
     // Listen for cursor updates from other users
-    socketInstance.on('cursor-moved', (data) => {
+    socket.on('cursor-moved', (data) => {
       if (!note || note.id !== note.id) return;
       
       // Update cursor position for the user
@@ -203,7 +185,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     });
     
     // Listen for typing status updates
-    socketInstance.on('typing-updated', (data) => {
+    socket.on('typing-updated', (data) => {
       if (data.noteId === note.id) {
         setTypingUsers(data.users.map((user: any) => ({
           id: user.userId,
@@ -218,7 +200,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     });
     
     // Listen for image upload progress
-    socketInstance.on('image-upload-progress', (data) => {
+    socket.on('image-upload-progress', (data) => {
       if (data.noteId === note.id) {
         setImageUploads(prev => ({
           ...prev,
@@ -236,7 +218,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     });
     
     // Listen for image upload completion
-    socketInstance.on('image-upload-complete', (data) => {
+    socket.on('image-upload-complete', (data) => {
       if (data.noteId === note.id) {
         // Update the upload status
         setImageUploads(prev => ({
@@ -250,24 +232,29 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
         }));
         
         // If it's from another user, insert the image at the specified position
-        if (data.userId !== socketInstance.id) {
+        if (data.userId !== socket.id) {
           insertImageAtPosition(data.url, data.insertPosition);
         }
       }
     });
     
-    setSocket(socketInstance);
-    
-    // Cleanup on unmount
+    // Clean up on unmount or when note changes
     return () => {
-      if (socketInstance) {
-        if (note?.id) {
-          socketInstance.emit('leave-note', note.id);
-        }
-        socketInstance.disconnect();
-      }
+      console.log('Cleaning up socket event listeners for note:', note.id);
+      
+      // Leave the note's room
+      socket.emit('leave-note', note.id);
+      
+      // Remove all event listeners
+      socket.off('note-version');
+      socket.off('note-updated');
+      socket.off('version-conflict');
+      socket.off('cursor-moved');
+      socket.off('typing-updated');
+      socket.off('image-upload-progress');
+      socket.off('image-upload-complete');
     };
-  }, [userToken, note?.id]);
+  }, [socket, note?.id]);
   
   // Initialize editor when note changes
   useEffect(() => {
@@ -327,7 +314,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   
   // Update cursor position and broadcast it
   useEffect(() => {
-    if (!socket || !note?.id || readOnly) return;
+    if (!socket || !isConnected || !note?.id || readOnly) return;
     
     const currentSelection = editorState.getSelection();
     const currentContent = editorState.getCurrentContent();
@@ -377,7 +364,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
         clearTimeout(throttleRef.current);
       }
     };
-  }, [editorState, socket, note?.id, saveStatus]);
+  }, [editorState, socket, isConnected, note?.id, saveStatus]);
 
   // Function to get a consistent color based on user ID
   const getRandomColor = (userId: string) => {

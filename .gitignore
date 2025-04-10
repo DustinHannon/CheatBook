@@ -6,3 +6,4 @@ client/out/_next
 .env.development.local
 .env.test.local
 .env.production.local
+server/logs

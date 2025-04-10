@@ -1,6 +1,7 @@
 /**
  * CheatBook Server
  * Main application server for the CheatBook note-taking app
+ * Provides REST API and real-time collaboration features
  */
 
 // Import required dependencies
@@ -11,13 +12,31 @@ const fs = require('fs');
 const socketIO = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 const dotenv = require('dotenv');
+
+// Import application modules
 const { setupSocketHandlers } = require('./services/socket.service');
+const { initializeDatabase } = require('./models/database');
+const { logger, requestLogger } = require('./utils/logging/logger');
+const storageConfig = require('./config/storage');
+const authConfig = require('./config/auth');
+
+// Import routes
 const authRoutes = require('./routes/auth.routes');
 const noteRoutes = require('./routes/note.routes');
 const userRoutes = require('./routes/user.routes');
-const { initializeDatabase } = require('./models/database');
-const { authenticateJWT, optionalJWT } = require('./middleware/auth.middleware');
+const notebookRoutes = require('./routes/notebook.routes');
+
+// Import middleware
+const { 
+  authenticateJWT, 
+  optionalJWT, 
+  csrfProtection, 
+  securityHeaders 
+} = require('./middleware/auth.middleware');
 
 // Load environment variables
 dotenv.config();
@@ -29,19 +48,39 @@ const server = http.createServer(app);
 // Set up Socket.IO with CORS configuration
 const io = socketIO(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: authConfig.security.corsOrigins,
     methods: ['GET', 'POST'],
     credentials: true
-  }
+  },
+  pingTimeout: 60000, // 60s ping timeout (better for reconnection)
+  maxHttpBufferSize: 5e6 // 5MB max payload
+});
+
+// Rate limiting middleware
+const apiLimiter = rateLimit({
+  windowMs: authConfig.rateLimit.windowMs,
+  max: authConfig.rateLimit.maxRequests,
+  message: authConfig.rateLimit.message,
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
 // Configure middlewares
+app.use(compression()); // Compress responses
+app.use(helmet({
+  contentSecurityPolicy: false // Handled by securityHeaders middleware
+}));
+app.use(requestLogger);
+
+// Configure CORS
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: authConfig.security.corsOrigins,
   credentials: true
 }));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Parse JSON and URL-encoded data
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // Create uploads directory if it doesn't exist

@@ -1,21 +1,24 @@
 /**
  * Socket.IO service
  * Handles real-time communication and collaboration features
+ * Implements throttling and debouncing for performance optimization
  */
 
 const { verifyToken } = require('../utils/auth.utils');
 const { db } = require('../models/database');
+const { logger } = require('../utils/logging/logger');
+const collabService = require('./collaborative-editing.service');
+const throttle = require('lodash.throttle');
+const debounce = require('lodash.debounce');
 
-// Track active users in each note/document
-const activeUsers = new Map();
 // Track user details by socket ID
 const userSockets = new Map();
-// Track collaborative editing versions for conflict resolution
-const noteVersions = new Map();
-// Track users currently typing in each note
-const activeTyping = new Map();
-// Track users currently uploading images to each note
-const activeUploads = new Map();
+// Track socket connections by user ID (for multiple devices)
+const userConnections = new Map();
+// Track disconnection timeouts for reconnection support
+const disconnectionTimeouts = new Map();
+// Reconnection window in milliseconds (30 seconds)
+const RECONNECTION_WINDOW_MS = 30 * 1000;
 
 /**
  * Set up all Socket.IO event handlers
@@ -28,33 +31,59 @@ function setupSocketHandlers(io) {
       const token = socket.handshake.auth.token;
       
       if (!token) {
+        logger.warn('Socket connection attempt without token');
         return next(new Error('Authentication error: Token missing'));
       }
       
       // Verify JWT token
       const user = await verifyToken(token);
       if (!user) {
+        logger.warn(`Invalid token used for socket connection: ${socket.id}`);
         return next(new Error('Authentication error: Invalid token'));
       }
       
       // Store user information in socket
       socket.user = user;
+      
+      // Store client info for debugging
+      socket.clientInfo = {
+        device: socket.handshake.headers['user-agent'],
+        ip: socket.handshake.address,
+        transport: socket.conn.transport.name
+      };
+      
+      logger.info(`Socket authenticated: ${user.id} (${socket.id})`);
       return next();
     } catch (error) {
-      console.error('Socket authentication error:', error);
+      logger.error('Socket authentication error:', error);
       return next(new Error('Authentication error'));
     }
   });
 
   io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`);
+    logger.info(`User connected: ${socket.user.id} (${socket.id})`);
     
     // Store socket information for the connected user
     userSockets.set(socket.id, {
       userId: socket.user.id,
       name: socket.user.name,
-      email: socket.user.email
+      email: socket.user.email,
+      color: getRandomColor(socket.user.id),
+      clientInfo: socket.clientInfo
     });
+    
+    // Track connections by user ID for multiple devices
+    if (!userConnections.has(socket.user.id)) {
+      userConnections.set(socket.user.id, new Set());
+    }
+    userConnections.get(socket.user.id).add(socket.id);
+    
+    // Clear any pending disconnection timeout for this user
+    if (disconnectionTimeouts.has(socket.user.id)) {
+      clearTimeout(disconnectionTimeouts.get(socket.user.id));
+      disconnectionTimeouts.delete(socket.user.id);
+      logger.info(`User ${socket.user.id} reconnected before timeout`);
+    }
 
     // Handle joining a note editing session
     socket.on('join-note', async (noteId) => {
@@ -63,185 +92,314 @@ function setupSocketHandlers(io) {
         const canAccess = await checkNoteAccess(socket.user.id, noteId);
         
         if (!canAccess) {
+          logger.warn(`Access denied to note ${noteId} for user ${socket.user.id}`);
           socket.emit('error', { message: 'Access denied to this note' });
           return;
         }
         
+        // Store current note ID in socket for cleanup on disconnect
+        socket.currentNoteId = noteId;
+        
         // Join the note's room
         socket.join(`note:${noteId}`);
         
-        // Track active users in this note
-        if (!activeUsers.has(noteId)) {
-          activeUsers.set(noteId, new Set());
-        }
+        // Initialize collaborative editing document if not exists
+        await initializeNoteDocument(noteId);
         
-        const users = activeUsers.get(noteId);
-        users.add(socket.user.id);
+        // Join collaborative editing session with user data
+        const sessionData = collabService.joinSession(noteId, socket.user.id, {
+          name: socket.user.name,
+          email: socket.user.email,
+          color: userSockets.get(socket.id)?.color
+        });
         
-        // Initialize version tracking for this note if not exists
-        if (!noteVersions.has(noteId)) {
-          noteVersions.set(noteId, {
-            version: 1,
-            lastContent: null,
-            lastUpdate: new Date()
-          });
-        }
+        // Get current document state
+        const docState = collabService.getDocumentState(noteId);
         
-        // Initialize typing tracking for this note
-        if (!activeTyping.has(noteId)) {
-          activeTyping.set(noteId, new Map());
-        }
-        
-        // Initialize upload tracking for this note
-        if (!activeUploads.has(noteId)) {
-          activeUploads.set(noteId, new Map());
-        }
-        
-        // Send current document version to the joining user
-        socket.emit('note-version', {
+        // Send current document version and state to the joining user
+        socket.emit('note-state', {
           noteId,
-          version: noteVersions.get(noteId).version
+          version: docState.version,
+          content: docState.content,
+          activeUsers: docState.activeUsers,
+          cursors: docState.cursors,
+          typing: docState.typing
         });
         
         // Notify all clients in the room about the updated user list
-        const userList = await getUsersInNote(noteId);
-        io.to(`note:${noteId}`).emit('users-changed', userList);
+        io.to(`note:${noteId}`).emit('users-changed', docState.activeUsers);
         
-        console.log(`User ${socket.user.id} joined note ${noteId}`);
+        logger.info(`User ${socket.user.id} joined note ${noteId}`);
       } catch (error) {
-        console.error(`Error joining note ${noteId}:`, error);
-        socket.emit('error', { message: 'Failed to join note' });
+        logger.error(`Error joining note ${noteId}:`, error);
+        socket.emit('error', { message: 'Failed to join note: ' + error.message });
       }
     });
 
     // Handle leaving a note
     socket.on('leave-note', (noteId) => {
+      handleUserLeaveNote(socket, noteId);
+    });
+
+    /**
+     * Helper function to handle a user leaving a note
+     * Used for both explicit leave-note events and disconnects
+     */
+    function handleUserLeaveNote(socket, noteId) {
+      if (!noteId) return;
+      
       socket.leave(`note:${noteId}`);
       
-      // Update active users
-      if (activeUsers.has(noteId)) {
-        const users = activeUsers.get(noteId);
-        users.delete(socket.user.id);
+      // Leave collaborative editing session
+      collabService.leaveSession(noteId, socket.user.id);
+      
+      // Check if user has other active connections to this note
+      const hasOtherConnections = Array.from(userConnections.get(socket.user.id) || [])
+        .some(socketId => {
+          if (socketId === socket.id) return false;
+          const otherSocket = io.sockets.sockets.get(socketId);
+          return otherSocket && otherSocket.currentNoteId === noteId;
+        });
+      
+      // If no other connections, fully remove the user
+      if (!hasOtherConnections) {
+        // Get updated document state
+        const docState = collabService.getDocumentState(noteId);
         
-        if (users.size === 0) {
-          activeUsers.delete(noteId);
+        if (docState) {
+          // Notify remaining users
+          io.to(`note:${noteId}`).emit('users-changed', docState.activeUsers);
+          io.to(`note:${noteId}`).emit('typing-updated', {
+            noteId,
+            users: docState.typing.map(userId => {
+              const socketId = Array.from(userSockets.entries())
+                .find(([, user]) => user.userId === userId)?.[0];
+              const user = userSockets.get(socketId) || {};
+              return {
+                userId,
+                userName: user.name || 'Unknown',
+                color: user.color || getRandomColor(userId)
+              };
+            })
+          });
+        }
+        
+        // Check if no users remain in the note
+        if (docState && docState.activeUsers.length === 0) {
+          // Save the final state to database before cleanup
+          saveNoteContent(noteId, docState.content, null)
+            .then(() => {
+              logger.info(`Saved final state of note ${noteId} before cleanup`);
+            })
+            .catch(err => {
+              logger.error(`Error saving final state of note ${noteId}:`, err);
+            });
+          
+          // Schedule cleanup after delay (in case users reconnect soon)
+          setTimeout(() => {
+            // Double-check no users have rejoined
+            const currentState = collabService.getDocumentState(noteId);
+            if (currentState && currentState.activeUsers.length === 0) {
+              collabService.cleanupDocument(noteId);
+              logger.info(`Cleaned up resources for note ${noteId}`);
+            }
+          }, RECONNECTION_WINDOW_MS);
         }
       }
       
-      // Notify remaining users
-      io.to(`note:${noteId}`).emit('users-changed', 
-        [...activeUsers.get(noteId) || []].map(userId => ({
-          id: userId,
-          name: userSockets.get([...userSockets.entries()]
-            .find(([, user]) => user.userId === userId)?.[0])?.name || 'Unknown'
-        }))
-      );
+      logger.info(`User ${socket.user.id} left note ${noteId}`);
+    }
+
+    /**
+     * Initialize note document for collaborative editing
+     * @param {string} noteId - Note ID
+     */
+    async function initializeNoteDocument(noteId) {
+      // Check if document already initialized
+      if (collabService.getDocumentState(noteId)) {
+        return;
+      }
       
-      console.log(`User ${socket.user.id} left note ${noteId}`);
-    });
+      try {
+        // Get note content from database
+        const note = await getNoteContent(noteId);
+        
+        if (!note) {
+          throw new Error(`Note not found: ${noteId}`);
+        }
+        
+        // Initialize collaborative document
+        collabService.initializeDocument(noteId, note.content || '');
+      } catch (error) {
+        logger.error(`Error initializing document ${noteId}:`, error);
+        throw error;
+      }
+    }
 
     // Handle note content changes (real-time editing)
     socket.on('note-update', (data) => {
-      const { noteId, content, localVersion } = data;
+      const { noteId, operation, content, baseVersion, shouldSave } = data;
       
-      // Get current version info
-      const versionInfo = noteVersions.get(noteId);
-      
-      if (!versionInfo) {
-        socket.emit('error', { message: 'Note version information not found' });
+      if (!noteId) {
+        socket.emit('error', { message: 'Note ID is required' });
         return;
       }
       
-      // Handle version conflicts
-      if (localVersion && localVersion < versionInfo.version) {
-        // Client is behind, send latest version
-        socket.emit('version-conflict', {
-          noteId,
-          currentVersion: versionInfo.version,
-          latestContent: versionInfo.lastContent
-        });
-        return;
-      }
-      
-      // Update version info
-      versionInfo.version += 1;
-      versionInfo.lastContent = content;
-      versionInfo.lastUpdate = new Date();
-      
-      // Broadcast the changes to all other users in the room
-      socket.to(`note:${data.noteId}`).emit('note-updated', {
-        noteId: data.noteId,
-        content: data.content,
-        userId: socket.user.id,
-        userName: socket.user.name,
-        timestamp: new Date().toISOString(),
-        version: versionInfo.version
-      });
-      
-      // Save the changes to the database (debounced on the client-side)
-      if (data.shouldSave) {
-        saveNoteContent(data.noteId, data.content, socket.user.id)
-          .catch(err => console.error('Error saving note:', err));
+      try {
+        // For operations-based updates (OT)
+        if (operation) {
+          // Ensure operation has a userId
+          operation.userId = socket.user.id;
+          
+          // Apply operation with conflict resolution
+          const result = collabService.applyOperation(
+            noteId,
+            operation,
+            baseVersion || 0
+          );
+          
+          // Send acknowledgment to the sender
+          socket.emit('operation-applied', {
+            noteId,
+            version: result.version,
+            conflicts: result.conflicts
+          });
+          
+          // Broadcast the operation to other users
+          socket.to(`note:${noteId}`).emit('remote-operation', {
+            noteId,
+            operation: result.operation,
+            userId: socket.user.id,
+            userName: socket.user.name,
+            version: result.version,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Handle save if requested
+          if (shouldSave) {
+            saveNoteContent(noteId, result.content, socket.user.id)
+              .catch(err => logger.error('Error saving note:', err));
+          }
+        } 
+        // For content-based updates (legacy/fallback)
+        else if (content) {
+          // Get document state
+          const docState = collabService.getDocumentState(noteId);
+          
+          if (!docState) {
+            socket.emit('error', { message: 'Document not found' });
+            return;
+          }
+          
+          // Handle version conflicts
+          if (baseVersion && baseVersion < docState.version) {
+            // Client is behind, send latest version
+            socket.emit('version-conflict', {
+              noteId,
+              currentVersion: docState.version,
+              latestContent: docState.content
+            });
+            return;
+          }
+          
+          // Create a replace operation for the entire content
+          // This is a simplification - real implementation would calculate the diff
+          const operation = {
+            type: 'replace',
+            index: 0,
+            length: docState.content.length,
+            text: content,
+            userId: socket.user.id
+          };
+          
+          // Apply the operation
+          const result = collabService.applyOperation(noteId, operation, docState.version);
+          
+          // Broadcast the changes to all other users in the room
+          socket.to(`note:${noteId}`).emit('note-updated', {
+            noteId,
+            content: result.content,
+            userId: socket.user.id,
+            userName: socket.user.name,
+            timestamp: new Date().toISOString(),
+            version: result.version
+          });
+          
+          // Handle save if requested
+          if (shouldSave) {
+            saveNoteContent(noteId, result.content, socket.user.id)
+              .catch(err => logger.error('Error saving note:', err));
+          }
+        } else {
+          socket.emit('error', { message: 'No content or operation provided' });
+        }
+      } catch (error) {
+        logger.error(`Error handling note update for ${noteId}:`, error);
+        socket.emit('error', { message: 'Failed to update note: ' + error.message });
       }
     });
 
-    // Handle typing status updates
+    // Handle typing status updates (throttled)
     socket.on('typing-status', (data) => {
-      const { noteId, isTyping, position } = data;
+      const { noteId, isTyping } = data;
       
-      if (!activeTyping.has(noteId)) {
-        activeTyping.set(noteId, new Map());
-      }
+      if (!noteId) return;
       
-      const typingUsers = activeTyping.get(noteId);
+      const typingStatus = collabService.updateTypingStatus(noteId, socket.user.id, isTyping);
       
-      if (isTyping) {
-        typingUsers.set(socket.user.id, {
-          userId: socket.user.id,
-          userName: socket.user.name,
-          position,
-          timestamp: new Date()
-        });
-      } else {
-        typingUsers.delete(socket.user.id);
-      }
-      
-      // Broadcast typing status to other users
-      socket.to(`note:${noteId}`).emit('typing-updated', {
+      // Broadcast typing status to all users in the room
+      io.to(`note:${noteId}`).emit('typing-updated', {
         noteId,
-        users: Array.from(typingUsers.values())
+        users: typingStatus.map(userId => {
+          const socketId = Array.from(userSockets.entries())
+            .find(([, user]) => user.userId === userId)?.[0];
+          const user = userSockets.get(socketId) || {};
+          return {
+            userId,
+            userName: user.name || 'Unknown',
+            color: user.color || getRandomColor(userId)
+          };
+        })
       });
     });
 
-    // Handle cursor position updates for collaborative editing
+    // Handle cursor position updates for collaborative editing (throttled)
     socket.on('cursor-move', (data) => {
-      socket.to(`note:${data.noteId}`).emit('cursor-moved', {
-        userId: socket.user.id,
-        userName: socket.user.name,
-        position: data.position,
-        selection: data.selection // Add selection range info
+      const { noteId, position, selection } = data;
+      
+      if (!noteId) return;
+      
+      // Update user position in collaborative service
+      const cursors = collabService.updateCursorPosition(noteId, socket.user.id, {
+        position,
+        selection,
+        color: userSockets.get(socket.id)?.color || getRandomColor(socket.user.id)
+      });
+      
+      // Broadcast to other users
+      socket.to(`note:${noteId}`).emit('cursors-updated', {
+        noteId,
+        cursors: cursors.map(cursor => ({
+          userId: cursor.userId,
+          userName: (() => {
+            const socketId = Array.from(userSockets.entries())
+              .find(([, user]) => user.userId === cursor.userId)?.[0];
+            return userSockets.get(socketId)?.name || 'Unknown';
+          })(),
+          position: cursor.position,
+          color: cursor.position?.color || getRandomColor(cursor.userId)
+        }))
       });
     });
 
-    // Handle image uploads
+    // Handle image upload notifications
     socket.on('image-upload-started', (data) => {
       const { noteId, imageId, filename, size } = data;
       
-      if (!activeUploads.has(noteId)) {
-        activeUploads.set(noteId, new Map());
+      if (!noteId || !imageId) {
+        socket.emit('error', { message: 'Note ID and image ID are required' });
+        return;
       }
-      
-      const uploads = activeUploads.get(noteId);
-      
-      uploads.set(imageId, {
-        userId: socket.user.id,
-        userName: socket.user.name,
-        filename,
-        size,
-        progress: 0,
-        status: 'uploading',
-        startTime: new Date()
-      });
       
       // Broadcast upload started to other users
       socket.to(`note:${noteId}`).emit('image-upload-progress', {
@@ -249,25 +407,21 @@ function setupSocketHandlers(io) {
         imageId,
         userId: socket.user.id,
         userName: socket.user.name,
+        color: userSockets.get(socket.id)?.color || getRandomColor(socket.user.id),
         filename,
         size,
         progress: 0,
         status: 'uploading'
       });
+      
+      logger.info(`Image upload started: ${imageId} in note ${noteId} by user ${socket.user.id}`);
     });
 
-    // Handle image upload progress
-    socket.on('image-upload-progress', (data) => {
+    // Handle image upload progress (throttled)
+    const handleUploadProgress = throttle((socket, data) => {
       const { noteId, imageId, progress } = data;
       
-      if (!activeUploads.has(noteId)) return;
-      
-      const uploads = activeUploads.get(noteId);
-      const upload = uploads.get(imageId);
-      
-      if (!upload) return;
-      
-      upload.progress = progress;
+      if (!noteId || !imageId) return;
       
       // Broadcast progress to other users
       socket.to(`note:${noteId}`).emit('image-upload-progress', {
@@ -275,26 +429,24 @@ function setupSocketHandlers(io) {
         imageId,
         userId: socket.user.id,
         userName: socket.user.name,
+        color: userSockets.get(socket.id)?.color || getRandomColor(socket.user.id),
         progress,
         status: 'uploading'
       });
+    }, 300); // Throttle to max once per 300ms
+    
+    socket.on('image-upload-progress', (data) => {
+      handleUploadProgress(socket, data);
     });
 
     // Handle image upload completion
     socket.on('image-upload-complete', (data) => {
       const { noteId, imageId, url, insertPosition } = data;
       
-      if (!activeUploads.has(noteId)) return;
+      if (!noteId || !imageId || !url) return;
       
-      const uploads = activeUploads.get(noteId);
-      const upload = uploads.get(imageId);
-      
-      if (!upload) return;
-      
-      upload.status = 'complete';
-      upload.progress = 100;
-      upload.url = url;
-      upload.completedAt = new Date();
+      // Calculate upload time 
+      logger.info(`Image upload completed: ${imageId} in note ${noteId}`);
       
       // Broadcast completion to other users with insert position
       socket.to(`note:${noteId}`).emit('image-upload-complete', {
@@ -302,55 +454,81 @@ function setupSocketHandlers(io) {
         imageId,
         userId: socket.user.id,
         userName: socket.user.name,
+        color: userSockets.get(socket.id)?.color || getRandomColor(socket.user.id),
         url,
         insertPosition,
         status: 'complete'
       });
       
-      // Remove from tracking after a delay
-      setTimeout(() => {
-        if (activeUploads.has(noteId)) {
-          const uploads = activeUploads.get(noteId);
-          uploads.delete(imageId);
+      // Create an insert operation for the collaborative editor
+      if (insertPosition !== undefined) {
+        const docState = collabService.getDocumentState(noteId);
+        if (docState) {
+          const operation = {
+            type: 'insert',
+            index: insertPosition,
+            text: `![Image](${url})`, // Markdown format image
+            userId: socket.user.id
+          };
+          
+          // Apply operation to collaborative document
+          try {
+            const result = collabService.applyOperation(
+              noteId,
+              operation,
+              docState.version
+            );
+            
+            // Don't broadcast again since we already sent the upload complete event
+          } catch (error) {
+            logger.error(`Error applying image insertion operation:`, error);
+          }
         }
-      }, 60000); // Clean up after 1 minute
+      }
+    });
+    
+    // Handle image upload error
+    socket.on('image-upload-error', (data) => {
+      const { noteId, imageId, error } = data;
+      
+      if (!noteId || !imageId) return;
+      
+      // Broadcast error to other users
+      socket.to(`note:${noteId}`).emit('image-upload-error', {
+        noteId,
+        imageId,
+        userId: socket.user.id,
+        userName: socket.user.name,
+        error,
+        status: 'error'
+      });
+      
+      logger.error(`Image upload error: ${imageId} in note ${noteId}: ${error}`);
     });
 
     // Handle disconnection
     socket.on('disconnect', () => {
       const userData = userSockets.get(socket.id);
       if (userData) {
-        // Remove user from all active notes
-        for (const [noteId, users] of activeUsers.entries()) {
-          if (users.has(userData.userId)) {
-            users.delete(userData.userId);
+        // If user was in a note, handle leave
+        if (socket.currentNoteId) {
+          handleUserLeaveNote(socket, socket.currentNoteId);
+        }
+        
+        // Remove from user connections
+        if (userConnections.has(userData.userId)) {
+          userConnections.get(userData.userId).delete(socket.id);
+          if (userConnections.get(userData.userId).size === 0) {
+            userConnections.delete(userData.userId);
             
-            // Remove from typing tracking
-            if (activeTyping.has(noteId)) {
-              activeTyping.get(noteId).delete(userData.userId);
-            }
-            
-            // If no users left in the note, remove the note from tracking
-            if (users.size === 0) {
-              activeUsers.delete(noteId);
-              noteVersions.delete(noteId);
-              activeTyping.delete(noteId);
+            // Set a disconnection timeout
+            disconnectionTimeouts.set(userData.userId, setTimeout(() => {
+              // If the user hasn't reconnected after the window, consider them fully offline
+              disconnectionTimeouts.delete(userData.userId);
+              logger.info(`User ${userData.userId} considered fully offline`);
               
-              // Only remove uploads if no users remain (uploads can be long-running)
-              if (activeUploads.has(noteId) && 
-                  activeUploads.get(noteId).size === 0) {
-                activeUploads.delete(noteId);
-              }
-            } else {
-              // Notify remaining users
-              io.to(`note:${noteId}`).emit('users-changed', 
-                [...users].map(userId => ({
-                  id: userId,
-                  name: userSockets.get([...userSockets.entries()]
-                    .find(([, user]) => user.userId === userId)?.[0])?.name || 'Unknown'
-                }))
-              );
-            }
+              // Additional cleanup if needed
+            }, RECONNECTION_WINDOW_MS));
           }
         }
         
@@ -358,9 +536,50 @@ function setupSocketHandlers(io) {
         userSockets.delete(socket.id);
       }
       
-      console.log(`User disconnected: ${socket.id}`);
+      logger.info(`User disconnected: ${socket.id}`);
     });
+    
+    /**
+     * Get note content from database
+     * @param {string} noteId - Note ID
+     * @returns {Promise<Object|null>} - Note object or null if not found
+     */
+    function getNoteContent(noteId) {
+      return new Promise((resolve, reject) => {
+        db.get(
+          'SELECT id, title, content FROM notes WHERE id = ?',
+          [noteId],
+          (err, row) => {
+            if (err) return reject(err);
+            resolve(row || null);
+          }
+        );
+      });
+    }
   });
+}
+
+/**
+ * Generate a random color for a user
+ * The color will be consistent for the same user ID
+ * @param {string} userId - User ID to generate color for
+ * @returns {string} - CSS color string (hex)
+ */
+function getRandomColor(userId) {
+  // Create a simple hash from the userId
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = ((hash << 5) - hash) + userId.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+  
+  // Use the hash to seed a color
+  // Avoid too light/dark colors by limiting the range
+  const h = Math.abs(hash % 360);
+  const s = 70 + Math.abs((hash >> 8) % 30); // 70-100%
+  const l = 35 + Math.abs((hash >> 16) % 15); // 35-50%
+  
+  return `hsl(${h}, ${s}%, ${l}%)`;
 }
 
 /**
@@ -401,33 +620,6 @@ async function checkNoteAccess(userId, noteId) {
 }
 
 /**
- * Get list of users currently in a note
- * @param {string} noteId - The note's ID
- * @returns {Promise<Array>} - Array of user objects
- */
-async function getUsersInNote(noteId) {
-  if (!activeUsers.has(noteId)) {
-    return [];
-  }
-  
-  const userIds = [...activeUsers.get(noteId)];
-  
-  // Get user details from the database
-  return new Promise((resolve, reject) => {
-    const placeholders = userIds.map(() => '?').join(',');
-    
-    db.all(
-      `SELECT id, name, email, avatar FROM users WHERE id IN (${placeholders || "''?"})`,
-      userIds.length ? userIds : [''],
-      (err, rows) => {
-        if (err) return reject(err);
-        resolve(rows || []);
-      }
-    );
-  });
-}
-
-/**
  * Save note content to the database
  * @param {string} noteId - The note's ID
  * @param {string} content - The note content
@@ -441,6 +633,7 @@ async function saveNoteContent(noteId, content, userId) {
       [content, noteId],
       function(err) {
         if (err) return reject(err);
+        logger.debug(`Note ${noteId} saved by user ${userId || 'system'}`);
         resolve();
       }
     );
@@ -449,4 +642,4 @@ async function saveNoteContent(noteId, content, userId) {
 
 module.exports = {
   setupSocketHandlers
-}; 
+};
