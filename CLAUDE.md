@@ -1,6 +1,6 @@
 # CheatBook
 
-Real-time collaborative note-taking app with dark editorial aesthetic.
+IT team notes app — quick collaborative notes for IPs, scripts, how-tos, credentials, and reference info.
 
 ## Live URL
 https://thecheatbook.vercel.app
@@ -16,44 +16,58 @@ https://thecheatbook.vercel.app
 ## Design System
 - Dark palette: #0a0a0b base, #111113 raised, #18181b surface
 - Warm gold accent: #d4a574
-- CSS variables defined in styles/theme.css (--bg-base, --bg-raised, --bg-surface, --text-primary, --text-body, --accent, etc.)
+- CSS variables in styles/theme.css (--bg-base, --bg-raised, --bg-surface, --text-primary, --accent, etc.)
 - Tailwind mapped: bg-bg-base, bg-bg-raised, text-text-primary, text-accent, border-border, etc.
-- Noise grain overlay on body, gold divider lines, stagger-reveal animations
-- Font classes: font-display (Cormorant Garamond), font-body (DM Sans), font-mono (JetBrains Mono)
-- Typography classes: text-display-lg, text-display-md, text-display-sm, section-label
+- Font classes: font-display, font-body, font-mono
+- Typography classes: text-display-lg/md/sm, section-label
 
 ## Architecture
-- Auth: Supabase Auth email/password (components/AuthContext.tsx) — signIn, signUp, logout
-- Real-time: Supabase Realtime Presence + Broadcast (components/RealtimeContext.tsx)
-- Data: Direct client-to-Supabase queries with RLS (lib/api.ts)
+- Auth: Supabase Auth email/password (components/AuthContext.tsx)
+- Teams: Team context manages team state, members, roles (components/TeamContext.tsx)
+- Real-time: Supabase Realtime Presence + Broadcast per note (components/RealtimeContext.tsx)
+- Data: Direct client-to-Supabase queries with RLS (lib/api.ts, ~40 functions)
 - Storage: Supabase Storage buckets for images and avatars
-- Middleware: Next.js middleware for session refresh + route protection (middleware.ts)
+- Middleware: Auth + team-setup redirect (lib/supabase/middleware.ts)
+- Toasts: ToastProvider + useToast() hook (components/Toast.tsx)
 
 ## Pages
-- /login — Cinematic split-screen auth (components/Authentication.tsx)
-- / — Main dashboard: animated sidebar + editor (pages/index.tsx)
-- /search — Full-page search with editorial result cards (pages/search.tsx)
-- /profile — User settings, avatar, stats (pages/profile.tsx)
+- /login — Cinematic split-screen auth
+- /team-setup — Create or join a team (post-signup)
+- / — Dashboard: pinned notes, recent notes grid, category filters, activity feed
+- /notes/[id] — Note editor with real-time collaboration
+- /notebooks/[id] — Notebook listing with note cards
+- /search — Full-page search with editorial result cards
+- /profile — User settings, team management, avatar
 
 ## Supabase
 - Project ID: ccthpkbljqxwtugawcyc
 - Region: us-east-1
-- Tables: profiles, notebooks, notes, images, collaborators
-- RLS enabled on all tables
+- Tables: profiles, teams, team_members, notebooks, notes, categories, note_categories, images, hidden_notes, activity_log, collaborators
+- RLS enabled on all tables — team-scoped access
 - Storage buckets: images, avatars
-- Auth: email/password with email confirmation enabled
+- Auth: email/password with email confirmation
+- Database functions: create_team_with_owner(team_name), join_team_by_code(code)
+
+## Key Features
+- Teams: create/join with invite code, admin/member roles, team-scoped data
+- Categories: colored tags (Network, Servers, Scripts, Credentials, How-To, General)
+- Note locking: prevent accidental edits on important notes
+- Note pinning: pin to dashboard top
+- Note hiding: per-user hide without deleting
+- Note metadata: created by, last edited by with timestamps
+- Activity log: team actions tracked and displayed in dashboard feed
+- Real-time: presence, typing indicators, live content sync
+- Auto-save: 2-second debounced save with status indicator
 
 ## Key Files
-- styles/theme.css — Design system variables, noise overlay, animations
-- styles/editor.css — Draft.js editorial typography overrides
-- tailwind.config.js — Font families, color tokens, animation keyframes
-- lib/api.ts — All data access functions (CRUD for notebooks, notes, collaborators, images, profiles)
-- components/NoteEditor.tsx — Draft.js editor with floating toolbar and collaboration
-- components/FloatingToolbar.tsx — Selection-triggered formatting toolbar
-- components/CommandPalette.tsx — Cmd+K search overlay with keyboard navigation
-- components/Layout.tsx — App shell with animated 280px sidebar
-- components/NavBar.tsx — Minimal 52px top bar with search trigger and user menu
-- components/NotesList.tsx — Editorial sidebar with gold accents, collapsible sections
+- lib/api.ts — ~40 data access functions (teams, notebooks, notes, categories, locking, pinning, hiding, activity)
+- components/TeamContext.tsx — Team state, members, roles, invite/remove
+- components/NoteEditor.tsx — Draft.js editor with floating toolbar, lock banner, metadata, collaboration
+- components/NoteCard.tsx — Reusable note preview card with categories, lock/pin icons
+- components/Dashboard/ — PinnedNotes, RecentNotes, CategoryChips, ActivityFeed
+- components/Toast.tsx — Toast notification system
+- components/ConfirmDialog.tsx — Styled confirmation modal
+- components/CommandPalette.tsx — Cmd+K search overlay
 
 ## Commands
 - `npm run dev` — Start dev server
