@@ -73,6 +73,7 @@ export default function Home() {
     };
 
     fetchNotes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedNotebook?.id]);
 
   const handleSelectNotebook = useCallback((notebookId: string) => {

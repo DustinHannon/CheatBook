@@ -38,7 +38,7 @@ const VerificationForm: React.FC<VerificationFormProps> = ({ email, onBack }) =>
           Enter Verification Code
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-          We've sent a 6-digit code to <span className="font-medium text-indigo-600 dark:text-indigo-400">{email}</span>
+          We&apos;ve sent a 6-digit code to <span className="font-medium text-indigo-600 dark:text-indigo-400">{email}</span>
         </p>
       </div>
 
@@ -98,7 +98,7 @@ const VerificationForm: React.FC<VerificationFormProps> = ({ email, onBack }) =>
         </div>
 
         <div className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
-          <p>Didn't receive a code?</p>
+          <p>Didn&apos;t receive a code?</p>
           <button
             type="button"
             onClick={() => onBack()}

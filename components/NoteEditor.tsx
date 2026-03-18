@@ -196,6 +196,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       channelRef.current = null;
       leaveNote(note.id);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id, user?.id]);
 
   // Initialize editor when note changes
@@ -222,6 +223,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       setTitle('Untitled');
       setEditorState(EditorState.createEmpty());
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id]);
 
   // Auto-save
@@ -239,6 +241,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     setSaveTimer(timer);
 
     return () => { if (saveTimer) clearTimeout(saveTimer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, editorState]);
 
   // Broadcast cursor/typing via presence updates
@@ -264,6 +267,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     }, 100);
 
     return () => { if (throttleRef.current) clearTimeout(throttleRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorState, note?.id, saveStatus]);
 
   const insertImageAtPosition = (imageUrl: string, position: number) => {
@@ -371,6 +375,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
         },
       });
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [note?.id, user?.id, docVersion, title]
   );
 
