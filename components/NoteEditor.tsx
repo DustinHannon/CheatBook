@@ -1,18 +1,23 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Editor, EditorState, RichUtils, ContentState, convertToRaw, convertFromRaw, SelectionState, Modifier, ContentBlock } from 'draft-js';
 import 'draft-js/dist/Draft.css';
-import { 
+import {
   ArrowDownTrayIcon,
   CheckIcon,
   ExclamationCircleIcon,
-  DocumentDuplicateIcon, 
+  DocumentDuplicateIcon,
   ShareIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
 import UserPresence from './UserPresence';
-import { useSocket } from './SocketContext';
+import { useRealtime, getUserColor } from './RealtimeContext';
+import { useAuth } from './AuthContext';
+import { createClient } from '../lib/supabase/client';
+import { updateNote as apiUpdateNote, uploadNoteImage } from '../lib/api';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
-// Type definitions
+const supabase = createClient();
+
 interface NoteType {
   id: string;
   title: string;
@@ -21,6 +26,7 @@ interface NoteType {
   owner_id: string;
   owner_name?: string;
   notebook_id: string | null;
+  version?: number;
 }
 
 interface ActiveUser {
@@ -30,37 +36,26 @@ interface ActiveUser {
   last_active: Date;
   cursor?: {
     position: number;
-    selection?: {
-      start: number;
-      end: number;
-    };
+    selection?: { start: number; end: number };
   };
 }
 
 interface NoteEditorProps {
   note: NoteType | null;
-  activeUsers?: ActiveUser[];
-  onSave: (note: { id?: string; title: string; content: string }) => void;
+  onSave?: (note: { id?: string; title: string; content: string }) => void;
   onDelete?: (noteId: string) => void;
   onShare?: (noteId: string) => void;
   onDuplicate?: (noteId: string) => void;
   readOnly?: boolean;
-  userToken?: string; // JWT token for socket auth
 }
 
-/**
- * NoteEditor Component
- * Rich text editor for notes with collaboration features
- */
 const NoteEditor: React.FC<NoteEditorProps> = ({
   note,
-  activeUsers = [],
   onSave,
   onDelete,
   onShare,
   onDuplicate,
   readOnly = false,
-  userToken
 }) => {
   const [title, setTitle] = useState('');
   const [editorState, setEditorState] = useState(EditorState.createEmpty());
@@ -70,197 +65,143 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   const [docVersion, setDocVersion] = useState(1);
   const [localChanges, setLocalChanges] = useState(false);
   const [typingUsers, setTypingUsers] = useState<ActiveUser[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
+  const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
   const [imageUploads, setImageUploads] = useState<Record<string, any>>({});
-  
-  // Use the socket context
-  const { socket, isConnected } = useSocket();
-  
+
+  const { user } = useAuth();
+  const { joinNote, leaveNote } = useRealtime();
+
   const editorRef = useRef<Editor>(null);
-  const lastCursorPosition = useRef<number | null>(null);
   const lastSelectionState = useRef<SelectionState | null>(null);
   const throttleRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Set up socket event listeners
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const isRemoteUpdate = useRef(false);
+
+  // Set up Supabase Realtime channel
   useEffect(() => {
-    if (!socket || !note?.id) return;
-    
-    console.log('Setting up socket event listeners for note:', note.id);
-    
-    // Join the note's room
-    socket.emit('join-note', note.id);
-    
-    // Listen for note version info
-    socket.on('note-version', (data) => {
-      if (data.noteId === note.id) {
-        setDocVersion(data.version);
-      }
-    });
-    
-    // Listen for note updates from other users
-    socket.on('note-updated', (data) => {
-      if (data.noteId === note.id && data.userId !== socket.id) {
-        try {
-          // Update document version
-          setDocVersion(data.version);
-          
-          // If we have local changes, handle potential conflicts
-          if (localChanges) {
-            // For simplicity, we'll just overwrite with the server version
-            // In a real app, you'd want to implement Operational Transforms or CRDT
-            // to properly merge changes
-            console.warn('Local changes overwritten by server update');
+    if (!note?.id || !user) return;
+
+    const channel = joinNote(note.id, user.id, user.name);
+    channelRef.current = channel;
+    setIsConnected(true);
+
+    // Listen for presence changes
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const users: ActiveUser[] = [];
+      for (const [, presences] of Object.entries(state)) {
+        for (const presence of presences as any[]) {
+          if (presence.user_id !== user.id) {
+            users.push({
+              id: presence.user_id,
+              name: presence.user_name,
+              color: presence.color,
+              last_active: new Date(presence.online_at),
+              cursor: presence.cursor_position ? { position: presence.cursor_position } : undefined,
+            });
           }
-          
-          // Update editor state with new content from server
-          const contentState = convertFromRaw(JSON.parse(data.content));
-          const newEditorState = EditorState.createWithContent(contentState);
-          
-          // Try to preserve cursor position if possible
-          if (lastSelectionState.current) {
-            const withSelection = EditorState.forceSelection(newEditorState, lastSelectionState.current);
-            setEditorState(withSelection);
-          } else {
-            setEditorState(newEditorState);
-          }
-          
-          // Mark as saved when receiving updates
-          setSaveStatus('saved');
-          setLocalChanges(false);
-        } catch (error) {
-          console.error('Error applying remote changes:', error);
         }
       }
+      setActiveUsers(users);
     });
-    
-    // Listen for version conflicts
-    socket.on('version-conflict', (data) => {
-      if (data.noteId === note.id) {
-        // Update with the latest content from the server
-        try {
-          setDocVersion(data.currentVersion);
-          const contentState = convertFromRaw(JSON.parse(data.latestContent));
-          const newEditorState = EditorState.createWithContent(contentState);
+
+    // Listen for broadcast content changes from other users
+    channel.on('broadcast', { event: 'content-change' }, (payload: any) => {
+      const data = payload.payload;
+      if (data.userId === user.id) return;
+
+      try {
+        isRemoteUpdate.current = true;
+        const contentState = convertFromRaw(JSON.parse(data.content));
+        const newEditorState = EditorState.createWithContent(contentState);
+
+        if (lastSelectionState.current) {
+          setEditorState(EditorState.forceSelection(newEditorState, lastSelectionState.current));
+        } else {
           setEditorState(newEditorState);
-          setLocalChanges(false);
-          setSaveStatus('saved');
-        } catch (error) {
-          console.error('Error handling version conflict:', error);
         }
+
+        if (data.title) {
+          setTitle(data.title);
+        }
+        setDocVersion(data.version || docVersion);
+        setSaveStatus('saved');
+        setLocalChanges(false);
+        isRemoteUpdate.current = false;
+      } catch (error) {
+        console.error('Error applying remote changes:', error);
+        isRemoteUpdate.current = false;
       }
     });
-    
-    // Listen for cursor updates from other users
-    socket.on('cursor-moved', (data) => {
-      if (!note || note.id !== note.id) return;
-      
-      // Update cursor position for the user
-      const updatedUsers = activeUsers.map(user => {
-        if (user.id === data.userId) {
-          return {
-            ...user,
+
+    // Listen for typing status
+    channel.on('broadcast', { event: 'typing-status' }, (payload: any) => {
+      const data = payload.payload;
+      if (data.userId === user.id) return;
+
+      setTypingUsers(prev => {
+        if (data.isTyping) {
+          const exists = prev.find(u => u.id === data.userId);
+          if (exists) return prev;
+          return [...prev, {
+            id: data.userId,
+            name: data.userName,
+            color: getUserColor(data.userId),
             last_active: new Date(),
-            cursor: {
-              position: data.position,
-              selection: data.selection
-            }
-          };
+          }];
+        } else {
+          return prev.filter(u => u.id !== data.userId);
         }
-        return user;
       });
-      
-      // If user not in the active users list, add them
-      if (!updatedUsers.some(user => user.id === data.userId)) {
-        updatedUsers.push({
-          id: data.userId,
-          name: data.userName,
-          color: getRandomColor(data.userId),
-          last_active: new Date(),
-          cursor: {
-            position: data.position,
-            selection: data.selection
-          }
-        });
+    });
+
+    // Listen for image upload notifications
+    channel.on('broadcast', { event: 'image-upload' }, (payload: any) => {
+      const data = payload.payload;
+      if (data.userId === user.id) return;
+
+      setImageUploads(prev => ({
+        ...prev,
+        [data.imageId]: data,
+      }));
+
+      if (data.status === 'complete' && data.url) {
+        insertImageAtPosition(data.url, data.insertPosition || 0);
+        setTimeout(() => {
+          setImageUploads(prev => {
+            const next = { ...prev };
+            delete next[data.imageId];
+            return next;
+          });
+        }, 2000);
       }
     });
-    
-    // Listen for typing status updates
-    socket.on('typing-updated', (data) => {
-      if (data.noteId === note.id) {
-        setTypingUsers(data.users.map((user: any) => ({
-          id: user.userId,
-          name: user.userName,
-          color: getRandomColor(user.userId),
-          last_active: new Date(user.timestamp),
-          cursor: {
-            position: user.position
-          }
-        })));
+
+    // Listen for DB changes (fallback sync)
+    channel.on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'notes',
+      filter: `id=eq.${note.id}`,
+    }, (payload: any) => {
+      // Only apply if we don't have local changes
+      if (!localChanges && payload.new) {
+        setDocVersion(payload.new.version || 1);
       }
     });
-    
-    // Listen for image upload progress
-    socket.on('image-upload-progress', (data) => {
-      if (data.noteId === note.id) {
-        setImageUploads(prev => ({
-          ...prev,
-          [data.imageId]: {
-            id: data.imageId,
-            userId: data.userId,
-            userName: data.userName,
-            filename: data.filename,
-            size: data.size,
-            progress: data.progress,
-            status: data.status
-          }
-        }));
-      }
-    });
-    
-    // Listen for image upload completion
-    socket.on('image-upload-complete', (data) => {
-      if (data.noteId === note.id) {
-        // Update the upload status
-        setImageUploads(prev => ({
-          ...prev,
-          [data.imageId]: {
-            ...prev[data.imageId],
-            progress: 100,
-            status: 'complete',
-            url: data.url
-          }
-        }));
-        
-        // If it's from another user, insert the image at the specified position
-        if (data.userId !== socket.id) {
-          insertImageAtPosition(data.url, data.insertPosition);
-        }
-      }
-    });
-    
-    // Clean up on unmount or when note changes
+
     return () => {
-      console.log('Cleaning up socket event listeners for note:', note.id);
-      
-      // Leave the note's room
-      socket.emit('leave-note', note.id);
-      
-      // Remove all event listeners
-      socket.off('note-version');
-      socket.off('note-updated');
-      socket.off('version-conflict');
-      socket.off('cursor-moved');
-      socket.off('typing-updated');
-      socket.off('image-upload-progress');
-      socket.off('image-upload-complete');
+      setIsConnected(false);
+      channelRef.current = null;
+      leaveNote(note.id);
     };
-  }, [socket, note?.id]);
-  
+  }, [note?.id, user?.id]);
+
   // Initialize editor when note changes
   useEffect(() => {
     if (note) {
       setTitle(note.title || 'Untitled');
-      
       try {
         if (note.content) {
           const contentState = convertFromRaw(JSON.parse(note.content));
@@ -274,7 +215,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
           ContentState.createFromText(note.content || '')
         ));
       }
-      
+      setDocVersion(note.version || 1);
       setSaveStatus('saved');
       setLocalChanges(false);
     } else {
@@ -283,152 +224,74 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     }
   }, [note?.id]);
 
-  // Auto-save functionality
+  // Auto-save
   useEffect(() => {
     if (!note || readOnly) return;
-    
-    // Clear previous timer
-    if (saveTimer) {
-      clearTimeout(saveTimer);
-    }
-    
-    // Don't trigger save on initial load
+    if (saveTimer) clearTimeout(saveTimer);
     if (saveStatus === 'saved') return;
-    
-    // Set status to unsaved
+
     setSaveStatus('unsaved');
     setLocalChanges(true);
-    
-    // Schedule auto-save after 2 seconds of inactivity
+
     const timer = setTimeout(() => {
       handleSave();
     }, 2000);
-    
     setSaveTimer(timer);
-    
-    // Cleanup
-    return () => {
-      if (saveTimer) clearTimeout(saveTimer);
-    };
-  }, [title, editorState]);
-  
-  // Update cursor position and broadcast it
-  useEffect(() => {
-    if (!socket || !isConnected || !note?.id || readOnly) return;
-    
-    const currentSelection = editorState.getSelection();
-    const currentContent = editorState.getCurrentContent();
-    const startKey = currentSelection.getStartKey();
-    const startOffset = currentSelection.getStartOffset();
-    const endKey = currentSelection.getEndKey();
-    const endOffset = currentSelection.getEndOffset();
-    const isCollapsed = currentSelection.isCollapsed();
-    
-    // Calculate cursor position (simplified for example - you'd need more complex logic in real app)
-    const cursorPosition = currentContent.getBlockForKey(startKey).getLength() + startOffset;
-    
-    // Store for potential conflict resolution
-    lastCursorPosition.current = cursorPosition;
-    lastSelectionState.current = currentSelection;
-    
-    // Throttle cursor updates to avoid flooding the socket
-    if (throttleRef.current) {
-      clearTimeout(throttleRef.current);
-    }
-    
-    throttleRef.current = setTimeout(() => {
-      // Send cursor position update
-      socket.emit('cursor-move', {
-        noteId: note.id,
-        position: cursorPosition,
-        selection: isCollapsed ? undefined : {
-          start: cursorPosition,
-          end: currentContent.getBlockForKey(endKey).getLength() + endOffset
-        }
-      });
-      
-      // Update typing status
-      const nowTyping = saveStatus === 'unsaved';
-      if (nowTyping !== isTyping) {
-        setIsTyping(nowTyping);
-        socket.emit('typing-status', {
-          noteId: note.id,
-          isTyping: nowTyping,
-          position: cursorPosition
-        });
-      }
-    }, 100); // 100ms throttle
-    
-    return () => {
-      if (throttleRef.current) {
-        clearTimeout(throttleRef.current);
-      }
-    };
-  }, [editorState, socket, isConnected, note?.id, saveStatus]);
 
-  // Function to get a consistent color based on user ID
-  const getRandomColor = (userId: string) => {
-    const colors = [
-      '#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444',
-      '#8b5cf6', '#ec4899', '#f43f5e', '#06b6d4', '#84cc16'
-    ];
-    
-    // Simple hash function to get a consistent index
-    let hash = 0;
-    for (let i = 0; i < userId.length; i++) {
-      hash = userId.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    
-    const index = Math.abs(hash) % colors.length;
-    return colors[index];
-  };
-  
-  // Insert image at specified position
+    return () => { if (saveTimer) clearTimeout(saveTimer); };
+  }, [title, editorState]);
+
+  // Broadcast cursor/typing via presence updates
+  useEffect(() => {
+    if (!channelRef.current || !note?.id || readOnly || !user) return;
+
+    const currentSelection = editorState.getSelection();
+    lastSelectionState.current = currentSelection;
+
+    if (throttleRef.current) clearTimeout(throttleRef.current);
+
+    throttleRef.current = setTimeout(() => {
+      const nowTyping = saveStatus === 'unsaved';
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing-status',
+        payload: {
+          userId: user.id,
+          userName: user.name,
+          isTyping: nowTyping,
+        },
+      });
+    }, 100);
+
+    return () => { if (throttleRef.current) clearTimeout(throttleRef.current); };
+  }, [editorState, note?.id, saveStatus]);
+
   const insertImageAtPosition = (imageUrl: string, position: number) => {
     try {
       const contentState = editorState.getCurrentContent();
       const blockMap = contentState.getBlockMap();
       let targetBlock: ContentBlock | undefined;
       let targetOffset: number | undefined;
-      
-      // This is a simplified approach - real implementation depends on your Draft.js setup
-      // Find the block and offset for the target position
       let currentPosition = 0;
-      
-      // Using BlockMap forEach method with proper type handling
-      blockMap.forEach((block: ContentBlock | undefined, key?: string) => {
+
+      blockMap.forEach((block: ContentBlock | undefined) => {
         if (block && !targetBlock && currentPosition + block.getLength() >= position) {
           targetBlock = block;
           targetOffset = position - currentPosition;
         }
-        if (block) {
-          currentPosition += block.getLength() + 1; // +1 for newline
-        }
+        if (block) currentPosition += block.getLength() + 1;
       });
-      
+
       if (targetBlock && targetOffset !== undefined) {
-        // Create selection at position
         const targetKey = targetBlock.getKey();
         const selectionState = SelectionState.createEmpty(targetKey).merge({
           anchorOffset: targetOffset,
           focusOffset: targetOffset,
         });
-        
-        // For this example, we'll just insert the image URL as text
-        // In a real implementation, you'd use an entity for images
+
         const textWithImage = `![Image](${imageUrl})`;
-        const contentWithImage = Modifier.insertText(
-          contentState,
-          selectionState,
-          textWithImage
-        );
-        
-        const newEditorState = EditorState.push(
-          editorState,
-          contentWithImage,
-          'insert-characters'
-        );
-        
+        const contentWithImage = Modifier.insertText(contentState, selectionState, textWithImage);
+        const newEditorState = EditorState.push(editorState, contentWithImage, 'insert-characters');
         setEditorState(newEditorState);
       }
     } catch (error) {
@@ -436,51 +299,52 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     }
   };
 
-  // Handle keyboard commands in the editor
   const handleKeyCommand = (command: string, editorState: EditorState) => {
     const newState = RichUtils.handleKeyCommand(editorState, command);
-    
     if (newState) {
       setEditorState(newState);
       return 'handled';
     }
-    
     return 'not-handled';
   };
 
-  // Save the current note
   const handleSave = async () => {
     if (!note || readOnly) return;
-    
+
     setSaveStatus('saving');
     setIsSaving(true);
-    
+
     try {
       const contentState = editorState.getCurrentContent();
       const rawContent = JSON.stringify(convertToRaw(contentState));
-      
-      // Save to server
-      await onSave({
-        id: note.id,
+
+      // Save to Supabase
+      const updated = await apiUpdateNote(supabase, note.id, {
         title,
         content: rawContent,
+        version: docVersion + 1,
       });
-      
-      // Broadcast changes to other users
-      if (socket && isConnected) {
-        socket.emit('note-update', {
-          noteId: note.id,
+
+      // Broadcast to other users
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'content-change',
+        payload: {
+          userId: user?.id,
           content: rawContent,
-          localVersion: docVersion,
-          shouldSave: true
-        });
+          title,
+          version: updated.version,
+        },
+      });
+
+      // Notify parent
+      if (onSave) {
+        onSave({ id: note.id, title, content: rawContent });
       }
-      
+
       setSaveStatus('saved');
       setLocalChanges(false);
-      
-      // Update document version
-      setDocVersion(prev => prev + 1);
+      setDocVersion(updated.version || docVersion + 1);
     } catch (error) {
       console.error('Error saving note:', error);
       setSaveStatus('error');
@@ -489,48 +353,46 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     }
   };
 
-  // Send updates for real-time collaboration
   const broadcastChanges = useCallback(
     (editorState: EditorState) => {
-      if (!socket || !isConnected || !note?.id) return;
-      
+      if (!channelRef.current || !note?.id || !user) return;
+
       const contentState = editorState.getCurrentContent();
       const rawContent = JSON.stringify(convertToRaw(contentState));
-      
-      socket.emit('note-update', {
-        noteId: note.id,
-        content: rawContent,
-        localVersion: docVersion,
-        shouldSave: false
+
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'content-change',
+        payload: {
+          userId: user.id,
+          content: rawContent,
+          title,
+          version: docVersion,
+        },
       });
     },
-    [socket, isConnected, note?.id, docVersion]
+    [note?.id, user?.id, docVersion, title]
   );
-  
-  // Debounced onChange handler for the editor
+
   const handleEditorChange = useCallback(
     (newEditorState: EditorState) => {
       setEditorState(newEditorState);
-      
-      // Check if content actually changed to avoid unnecessary broadcasts
+
+      if (isRemoteUpdate.current) return;
+
       const currentContent = editorState.getCurrentContent();
       const newContent = newEditorState.getCurrentContent();
-      
+
       if (currentContent !== newContent) {
-        // Debounce broadcasting changes
-        if (throttleRef.current) {
-          clearTimeout(throttleRef.current);
-        }
-        
+        if (throttleRef.current) clearTimeout(throttleRef.current);
         throttleRef.current = setTimeout(() => {
           broadcastChanges(newEditorState);
-        }, 300); // 300ms debounce
+        }, 300);
       }
     },
     [editorState, broadcastChanges]
   );
 
-  // Handle toolbar button clicks for formatting
   const toggleInlineStyle = (style: string) => {
     setEditorState(RichUtils.toggleInlineStyle(editorState, style));
   };
@@ -539,76 +401,12 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     setEditorState(RichUtils.toggleBlockType(editorState, blockType));
   };
 
-  // Handle image paste
   const handlePaste = (text: string, html: string | undefined, editorState: EditorState): 'handled' | 'not-handled' => {
-    // We could implement image paste handling here
-    // For now, we'll just use the default paste behavior
     return 'not-handled';
   };
 
-  // Handle image upload
-  const handleImageUpload = (file: File, insertPosition: number) => {
-    if (!socket || !isConnected || !note?.id) return;
-    
-    const imageId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Announce upload started
-    socket.emit('image-upload-started', {
-      noteId: note.id,
-      imageId,
-      filename: file.name,
-      size: file.size
-    });
-    
-    // Simulate upload progress
-    let progress = 0;
-    const progressInterval = setInterval(() => {
-      progress += 10;
-      
-      // Update local state
-      setImageUploads(prev => ({
-        ...prev,
-        [imageId]: {
-          id: imageId,
-          filename: file.name,
-          size: file.size,
-          progress,
-          status: progress < 100 ? 'uploading' : 'complete'
-        }
-      }));
-      
-      // Broadcast progress
-      socket.emit('image-upload-progress', {
-        noteId: note.id,
-        imageId,
-        progress
-      });
-      
-      if (progress >= 100) {
-        clearInterval(progressInterval);
-        
-        // Simulate a URL for the uploaded image
-        const imageUrl = `https://example.com/uploads/${imageId}`;
-        
-        // Insert the image at the specified position
-        insertImageAtPosition(imageUrl, insertPosition);
-        
-        // Broadcast upload complete with the position to insert
-        socket.emit('image-upload-complete', {
-          noteId: note.id,
-          imageId,
-          url: imageUrl,
-          insertPosition
-        });
-      }
-    }, 300);
-  };
-
-  // Focus the editor
   const focusEditor = () => {
-    if (editorRef.current) {
-      editorRef.current.focus();
-    }
+    if (editorRef.current) editorRef.current.focus();
   };
 
   return (
@@ -701,16 +499,16 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
 
           {/* Active users */}
           <div className="flex items-center mr-4">
-            {activeUsers.map((user) => (
-              <UserPresence key={user.id} user={user} />
+            {activeUsers.map((u) => (
+              <UserPresence key={u.id} user={u} />
             ))}
           </div>
 
           {/* Typing indicators */}
           {typingUsers.length > 0 && (
             <div className="text-xs text-text-secondary mr-3 italic">
-              {typingUsers.length === 1 
-                ? `${typingUsers[0].name} is typing...` 
+              {typingUsers.length === 1
+                ? `${typingUsers[0].name} is typing...`
                 : `${typingUsers.length} users are typing...`}
             </div>
           )}
@@ -792,15 +590,15 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
 
         {/* Image upload progress indicators */}
         {Object.values(imageUploads).map((upload: any) => (
-          <div key={upload.id} className="mb-2 bg-surface rounded p-2 text-sm">
+          <div key={upload.imageId} className="mb-2 bg-surface rounded p-2 text-sm">
             <div className="flex justify-between">
-              <span>{upload.filename}</span>
-              <span>{upload.progress}%</span>
+              <span>{upload.fileName || 'Uploading...'}</span>
+              <span>{upload.progress || 0}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2.5 mt-1">
-              <div 
-                className="bg-primary h-2.5 rounded-full" 
-                style={{width: `${upload.progress}%`}}
+              <div
+                className="bg-primary h-2.5 rounded-full"
+                style={{ width: `${upload.progress || 0}%` }}
               ></div>
             </div>
           </div>
