@@ -1,18 +1,19 @@
 # CheatBook
 
-A real-time collaborative note-taking app. Create, edit, and share notes with live collaboration, image uploads, and organized notebooks.
+A real-time collaborative note-taking app with a dark editorial aesthetic. Create, edit, and share notes with live collaboration, image uploads, and organized notebooks.
 
 **Live:** [thecheatbook.vercel.app](https://thecheatbook.vercel.app)
 
 ## Tech Stack
 
-- **Framework**: Next.js 15 (Pages Router) with TypeScript
+- **Framework**: Next.js 15 (Pages Router), React 19, TypeScript
 - **Database**: Supabase PostgreSQL with Row Level Security
-- **Auth**: Supabase Auth (email OTP)
+- **Auth**: Supabase Auth (email + password with email confirmation)
 - **Real-time**: Supabase Realtime (Presence + Broadcast)
 - **Storage**: Supabase Storage (images, avatars)
-- **Styling**: Tailwind CSS 3 with CSS custom properties for theming
-- **Editor**: Draft.js rich text editor
+- **Styling**: Tailwind CSS 3 with dark editorial design system (CSS custom properties)
+- **Typography**: Cormorant Garamond (display), DM Sans (body), JetBrains Mono (code)
+- **Editor**: Draft.js with floating selection toolbar
 - **Hosting**: Vercel
 
 ## Getting Started
@@ -46,30 +47,57 @@ A real-time collaborative note-taking app. Create, edit, and share notes with li
 
 ## Features
 
+- Dark editorial UI with warm gold accent palette
 - Real-time collaborative editing with presence indicators
-- Email OTP authentication (no passwords)
+- Email + password authentication with email confirmation
+- Floating selection toolbar (appears on text highlight)
+- Command palette search (Cmd+K / Ctrl+K)
 - Rich text editor (bold, italic, headings, lists)
 - Image paste/upload into notes
-- Organized notebooks with note grouping
-- Global search across all notes
-- Light/dark theme
-- Automatic saving
+- Organized notebooks with editorial sidebar
+- Full-page search with result cards
+- User profile and settings page
+- Automatic saving with status indicators
+
+## Pages
+
+| Route | Description |
+|-------|-------------|
+| `/login` | Cinematic split-screen sign in / sign up |
+| `/` | Main dashboard — sidebar + editor |
+| `/search` | Full-page note search with editorial cards |
+| `/profile` | User settings, avatar, stats |
 
 ## Project Structure
 
 ```
-├── components/       # React components
-│   ├── AuthContext.tsx        # Supabase Auth provider
+├── components/
+│   ├── AuthContext.tsx        # Supabase Auth provider (email/password)
+│   ├── Authentication.tsx     # Cinematic split-screen login/signup
+│   ├── CommandPalette.tsx     # Cmd+K search overlay
+│   ├── FloatingToolbar.tsx    # Selection-triggered formatting toolbar
+│   ├── Layout.tsx             # App shell with animated sidebar
+│   ├── NavBar.tsx             # Minimal top bar with search trigger
+│   ├── NoteEditor.tsx         # Draft.js editor with collaboration
+│   ├── NotesList.tsx          # Editorial sidebar navigation
 │   ├── RealtimeContext.tsx    # Supabase Realtime channels
-│   ├── NoteEditor.tsx        # Draft.js editor with collaboration
-│   └── ...
+│   └── UserPresence.tsx       # Collaborator avatar badges
 ├── lib/
 │   ├── api.ts                # Supabase data access functions
-│   └── supabase/             # Supabase client utilities
-├── pages/            # Next.js pages
-├── styles/           # Tailwind CSS + theme variables
-└── middleware.ts     # Auth session refresh + route protection
+│   └── supabase/             # Client utilities
+├── pages/                    # Next.js pages (login, index, search, profile)
+├── styles/
+│   ├── theme.css             # Design system variables + animations
+│   └── editor.css            # Draft.js typography overrides
+└── middleware.ts             # Auth session refresh + route protection
 ```
+
+## Design System
+
+- **Palette**: Deep charcoal backgrounds (#0a0a0b, #111113, #18181b), warm gold accent (#d4a574), crisp white text (#fafafa)
+- **Typography**: Cormorant Garamond serif for display headings, DM Sans for body/UI, JetBrains Mono for code
+- **Texture**: CSS noise grain overlay, gold accent divider lines
+- **Animations**: Stagger reveals, ease-out-expo timing, fade-in/slide-up transitions
 
 ## License
 
