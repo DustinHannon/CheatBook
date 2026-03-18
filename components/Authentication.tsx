@@ -7,6 +7,7 @@ const Authentication: React.FC = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [signUpSuccess, setSignUpSuccess] = useState(false);
   const { isAuthenticated, user, signIn, signUp, error, setError } = useAuth();
 
   if (isAuthenticated && user) {
@@ -39,6 +40,7 @@ const Authentication: React.FC = () => {
     try {
       if (isSignUp) {
         await signUp(email, password, name || undefined);
+        setSignUpSuccess(true);
       } else {
         await signIn(email, password);
       }
@@ -77,6 +79,31 @@ const Authentication: React.FC = () => {
 
       {/* Right form panel */}
       <div className="flex-1 md:w-1/2 flex items-center justify-center bg-bg-base px-6 py-12 md:py-0">
+        {signUpSuccess ? (
+          <div className="max-w-sm w-full animate-slide-up text-center">
+            <div className="w-16 h-16 rounded-full bg-accent-muted flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h2 className="text-display-sm font-display text-text-primary">
+              Check your email
+            </h2>
+            <p className="text-sm text-text-secondary mt-3 font-body leading-relaxed">
+              We sent a confirmation link to<br />
+              <span className="text-text-primary font-medium">{email}</span>
+            </p>
+            <p className="text-xs text-text-tertiary mt-4 font-body">
+              Click the link in the email to activate your account, then come back here to sign in.
+            </p>
+            <button
+              onClick={() => { setSignUpSuccess(false); setIsSignUp(false); setError(null); }}
+              className="mt-8 text-sm text-accent hover:text-accent-hover font-body transition"
+            >
+              Back to sign in
+            </button>
+          </div>
+        ) : (
         <div className="max-w-sm w-full animate-slide-up">
           <div className="stagger-1">
             <h2 className="text-display-sm font-display text-text-primary">
@@ -184,6 +211,7 @@ const Authentication: React.FC = () => {
             </div>
           </form>
         </div>
+        )}
       </div>
     </div>
   );
