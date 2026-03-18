@@ -41,7 +41,7 @@ const ProfilePage: NextPage = () => {
         setProfile(profileData);
         setName(profileData.name || '');
         setStats(statsData);
-        setNotebooks([...notebooksData.owned, ...notebooksData.shared]);
+        setNotebooks(notebooksData);
       } catch {
         // Fail silently on initial load
       }

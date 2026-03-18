@@ -24,7 +24,7 @@ const SearchPage: NextPage = () => {
     const loadNotebooks = async () => {
       try {
         const data = await getNotebooks(supabase);
-        setNotebooks([...data.owned, ...data.shared]);
+        setNotebooks(data);
       } catch {
         // Silently fail - layout will just show empty
       }

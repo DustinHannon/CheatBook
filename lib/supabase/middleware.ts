@@ -29,23 +29,36 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Redirect unauthenticated users to login (except for /login itself)
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/api') &&
-    !request.nextUrl.pathname.startsWith('/_next')
-  ) {
+  const pathname = request.nextUrl.pathname;
+  const isPublic = pathname.startsWith('/login') || pathname.startsWith('/api') || pathname.startsWith('/_next');
+
+  // Redirect unauthenticated users to login
+  if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
   // Redirect authenticated users away from login
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
+  if (user && pathname.startsWith('/login')) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
     return NextResponse.redirect(url);
+  }
+
+  // Check if user needs team setup (skip if already on team-setup page)
+  if (user && !isPublic && !pathname.startsWith('/team-setup')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('team_id')
+      .eq('id', user.id)
+      .single();
+
+    if (profile && !profile.team_id) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/team-setup';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;
