@@ -1,4 +1,8 @@
-/* Theme CSS Variables 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme CSS Variables
  * This file contains CSS variables for light and dark themes
  */
 
