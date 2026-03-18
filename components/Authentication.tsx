@@ -59,7 +59,7 @@ const Authentication: React.FC = () => {
           </h1>
           <div className="divider-gold w-24 mx-auto my-6" />
           <p className="text-lg text-text-secondary font-body italic">
-            Where ideas take shape
+            Your IT knowledge base
           </p>
         </div>
       </div>
@@ -71,7 +71,7 @@ const Authentication: React.FC = () => {
         </h1>
         <div className="divider-gold w-16 mx-auto my-4" />
         <p className="text-base text-text-secondary font-body italic">
-          Where ideas take shape
+          Your IT knowledge base
         </p>
       </div>
 
