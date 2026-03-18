@@ -2,6 +2,8 @@
 
 A real-time collaborative note-taking app. Create, edit, and share notes with live collaboration, image uploads, and organized notebooks.
 
+**Live:** [thecheatbook.vercel.app](https://thecheatbook.vercel.app)
+
 ## Tech Stack
 
 - **Framework**: Next.js 15 (Pages Router) with TypeScript
