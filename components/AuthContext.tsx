@@ -12,8 +12,8 @@ type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string) => Promise<void>;
-  verifyCode: (email: string, code: string) => Promise<boolean>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   error: string | null;
   setError: (error: string | null) => void;
@@ -23,8 +23,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isAuthenticated: false,
   isLoading: true,
-  login: async () => {},
-  verifyCode: async () => false,
+  signIn: async () => {},
+  signUp: async () => {},
   logout: async () => {},
   error: null,
   setError: () => {},
@@ -46,7 +46,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check current session
     supabase.auth.getUser().then(({ data: { user: supabaseUser } }) => {
       if (supabaseUser) {
         setUser(mapUser(supabaseUser));
@@ -54,7 +53,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setIsLoading(false);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(mapUser(session.user));
@@ -67,12 +65,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string) => {
+  const signIn = async (email: string, password: string) => {
     setError(null);
     setIsLoading(true);
 
     try {
-      const { error: authError } = await supabase.auth.signInWithOtp({ email });
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       if (authError) {
         throw new Error(authError.message);
       }
@@ -85,30 +86,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const verifyCode = async (email: string, code: string): Promise<boolean> => {
+  const signUp = async (email: string, password: string, name?: string) => {
     setError(null);
     setIsLoading(true);
 
     try {
-      const { data, error: authError } = await supabase.auth.verifyOtp({
+      const { error: authError } = await supabase.auth.signUp({
         email,
-        token: code,
-        type: 'email',
+        password,
+        options: {
+          data: { name: name || email.split('@')[0] },
+        },
       });
-
       if (authError) {
         throw new Error(authError.message);
       }
-
-      if (data.user) {
-        setUser(mapUser(data.user));
-        return true;
-      }
-      return false;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'An error occurred';
       setError(message);
-      return false;
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -129,8 +125,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         user,
         isAuthenticated: !!user,
         isLoading,
-        login,
-        verifyCode,
+        signIn,
+        signUp,
         logout,
         error,
         setError,
