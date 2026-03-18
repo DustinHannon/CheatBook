@@ -12,88 +12,47 @@ interface UserPresenceProps {
   size?: 'small' | 'medium' | 'large';
 }
 
-/**
- * UserPresence Component
- * Displays an avatar indicator for users collaborating on a note
- */
-const UserPresence: React.FC<UserPresenceProps> = ({ 
-  user, 
-  size = 'medium' 
-}) => {
-  // Generate initial avatar for user if no image is available
-  const initial = useMemo(() => {
-    return user.name.charAt(0).toUpperCase();
-  }, [user.name]);
+const UserPresence: React.FC<UserPresenceProps> = ({ user, size = 'medium' }) => {
+  const initial = useMemo(() => user.name.charAt(0).toUpperCase(), [user.name]);
 
-  // Determine if user is currently active
   const isActive = useMemo(() => {
-    const now = new Date();
-    const lastActive = new Date(user.last_active);
-    const differenceInSeconds = (now.getTime() - lastActive.getTime()) / 1000;
-    return differenceInSeconds < 60; // Active if last seen less than a minute ago
+    const diff = (new Date().getTime() - new Date(user.last_active).getTime()) / 1000;
+    return diff < 60;
   }, [user.last_active]);
 
-  // Determine size of avatar based on prop
-  const dimensions = useMemo(() => {
+  const dims = useMemo(() => {
     switch (size) {
-      case 'small':
-        return {
-          outer: 'w-6 h-6',
-          inner: 'w-5 h-5',
-          text: 'text-xs',
-        };
-      case 'large':
-        return {
-          outer: 'w-10 h-10',
-          inner: 'w-9 h-9',
-          text: 'text-base',
-        };
-      case 'medium':
-      default:
-        return {
-          outer: 'w-8 h-8',
-          inner: 'w-7 h-7',
-          text: 'text-sm',
-        };
+      case 'small': return { outer: 'w-6 h-6', inner: 'w-5 h-5', text: 'text-[10px]', dot: 'w-2 h-2' };
+      case 'large': return { outer: 'w-10 h-10', inner: 'w-9 h-9', text: 'text-base', dot: 'w-3 h-3' };
+      default: return { outer: 'w-8 h-8', inner: 'w-7 h-7', text: 'text-sm', dot: 'w-2.5 h-2.5' };
     }
   }, [size]);
 
   const [showTooltip, setShowTooltip] = useState(false);
-  
+
   return (
-    <div 
+    <div
       className="relative mr-1 last:mr-0"
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >
-      <div className="focus:outline-none">
-        <div className={`${dimensions.outer} rounded-full flex items-center justify-center relative`}>
-          {/* Status indicator dot */}
-          <div 
-            className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-background-primary ${
-              isActive ? 'bg-success' : 'bg-gray-400'
-            }`}
-          />
-          
-          {/* User avatar circle */}
-          <div 
-            className={`${dimensions.inner} rounded-full flex items-center justify-center`} 
-            style={{ backgroundColor: user.color }}
-          >
-            <span className={`${dimensions.text} font-medium text-white`}>
-              {initial}
-            </span>
-          </div>
+      <div className={`${dims.outer} rounded-full flex items-center justify-center relative`}>
+        <div className={`absolute -top-0.5 -right-0.5 ${dims.dot} rounded-full border-2 border-bg-base ${
+          isActive ? 'bg-status-success' : 'bg-text-disabled'
+        }`} />
+        <div
+          className={`${dims.inner} rounded-full flex items-center justify-center`}
+          style={{ backgroundColor: user.color }}
+        >
+          <span className={`${dims.text} font-medium text-white`}>{initial}</span>
         </div>
       </div>
-      
+
       {showTooltip && (
-        <div className="absolute z-10 bg-surface shadow-lg rounded p-2 text-sm text-text-primary -translate-x-1/2 left-1/2 mt-1">
-          <div className="flex flex-col items-center">
-            <span>{user.name}</span>
-            <span className="text-xs text-text-tertiary">
-              {isActive ? 'Currently editing' : 'Last active: ' + new Date(user.last_active).toLocaleTimeString()}
-            </span>
+        <div className="absolute z-50 bg-bg-surface border border-border-default shadow-lg rounded-lg px-3 py-2 text-sm text-text-primary -translate-x-1/2 left-1/2 mt-1 whitespace-nowrap">
+          <span className="font-medium">{user.name}</span>
+          <div className="text-xs text-text-tertiary mt-0.5">
+            {isActive ? 'Editing now' : `Last active ${new Date(user.last_active).toLocaleTimeString()}`}
           </div>
         </div>
       )}

@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import NavBar from './NavBar';
 import NotesList from './NotesList';
-import { useRouter } from 'next/router';
+import CommandPalette from './CommandPalette';
 
-// Types
 interface LayoutProps {
   children: React.ReactNode;
   showSidebar?: boolean;
@@ -11,15 +10,12 @@ interface LayoutProps {
   notes?: any[];
   selectedNoteId?: string;
   selectedNotebookId?: string;
+  onSelectNote?: (noteId: string) => void;
+  onSelectNotebook?: (notebookId: string) => void;
   onCreateNote?: () => void;
   onCreateNotebook?: () => void;
-  onSelectNotebook?: (notebookId: string) => void;
 }
 
-/**
- * Layout Component
- * Main application layout with responsive behavior
- */
 const Layout: React.FC<LayoutProps> = ({
   children,
   showSidebar = true,
@@ -27,93 +23,93 @@ const Layout: React.FC<LayoutProps> = ({
   notes = [],
   selectedNoteId,
   selectedNotebookId,
+  onSelectNote,
+  onSelectNotebook,
   onCreateNote,
   onCreateNotebook,
-  onSelectNotebook,
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileView, setIsMobileView] = useState(false);
-  const router = useRouter();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // Handle responsive layout changes
   useEffect(() => {
     const handleResize = () => {
-      setIsMobileView(window.innerWidth < 768);
-      
-      // Auto-close sidebar on mobile
-      if (window.innerWidth < 768) {
+      const mobile = window.innerWidth < 768;
+      setIsMobileView(mobile);
+      if (mobile) {
         setIsSidebarOpen(false);
       } else {
         setIsSidebarOpen(true);
       }
     };
 
-    // Initial check
     handleResize();
-    
-    // Add event listener
     window.addEventListener('resize', handleResize);
-    
-    // Cleanup
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Toggle sidebar visibility
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen((prev) => !prev);
+  }, []);
 
-  // Default handlers if not provided
-  const defaultCreateNote = () => {
-    router.push('/notes/new');
-  };
+  const openSearch = useCallback(() => {
+    setIsSearchOpen(true);
+  }, []);
 
-  const defaultCreateNotebook = () => {
-    router.push('/notebooks/new');
-  };
+  const closeSearch = useCallback(() => {
+    setIsSearchOpen(false);
+  }, []);
 
   return (
-    <div className="flex flex-col h-screen bg-background-primary text-text-primary">
+    <div className="flex flex-col h-screen bg-bg-base text-text-body">
       {/* Navigation Bar */}
-      <NavBar 
-        onToggleSidebar={toggleSidebar} 
-        isSidebarOpen={isSidebarOpen} 
+      <NavBar
+        onToggleSidebar={toggleSidebar}
+        isSidebarOpen={isSidebarOpen}
         isMobileView={isMobileView}
+        onOpenSearch={openSearch}
       />
-      
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
+
+      {/* Main area below navbar */}
+      <div className="flex flex-1 overflow-hidden pt-[52px]">
         {/* Sidebar */}
-        {showSidebar && isSidebarOpen && (
-          <div className={`${isMobileView ? 'absolute inset-0 z-10' : 'w-64'}`}>
-            {isMobileView && (
-              <div 
-                className="absolute inset-0 bg-black bg-opacity-50 z-0"
+        {showSidebar && (
+          <>
+            {/* Mobile overlay backdrop */}
+            {isMobileView && isSidebarOpen && (
+              <div
+                className="fixed inset-0 z-20 bg-bg-overlay"
                 onClick={toggleSidebar}
               />
             )}
-            
-            <div className={`relative h-full ${isMobileView ? 'w-64 z-10' : 'w-full'}`}>
+
+            <aside
+              className={`${
+                isMobileView ? 'fixed top-[52px] left-0 bottom-0 z-30' : 'relative'
+              } w-[280px] bg-bg-raised border-r border-border-subtle shrink-0 transition-transform duration-[250ms] ease-out-expo ${
+                isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+              } ${!isSidebarOpen && !isMobileView ? 'absolute' : ''}`}
+            >
               <NotesList
                 notebooks={notebooks}
                 notes={notes}
                 selectedNoteId={selectedNoteId}
                 selectedNotebookId={selectedNotebookId}
-                onCreateNote={onCreateNote || defaultCreateNote}
-                onCreateNotebook={onCreateNotebook || defaultCreateNotebook}
+                onSelectNote={onSelectNote}
                 onSelectNotebook={onSelectNotebook}
+                onCreateNote={onCreateNote || (() => {})}
+                onCreateNotebook={onCreateNotebook || (() => {})}
               />
-            </div>
-          </div>
+            </aside>
+          </>
         )}
-        
-        {/* Main Content */}
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+
+        {/* Main content */}
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
+
+      {/* Command Palette */}
+      <CommandPalette isOpen={isSearchOpen} onClose={closeSearch} />
     </div>
   );
 };

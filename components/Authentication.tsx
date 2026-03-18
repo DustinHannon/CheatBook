@@ -11,14 +11,12 @@ const Authentication: React.FC = () => {
 
   if (isAuthenticated && user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-md w-full space-y-8 p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome!</h2>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">
-              You are signed in as <span className="font-medium">{user.email}</span>
-            </p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center bg-bg-base">
+        <div className="text-center">
+          <h2 className="text-display-sm font-display text-text-primary">Welcome back</h2>
+          <p className="mt-2 text-text-secondary font-body">
+            Signed in as <span className="text-text-primary">{user.email}</span>
+          </p>
         </div>
       </div>
     );
@@ -52,107 +50,140 @@ const Authentication: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-            {isSignUp ? 'Create an account' : 'Sign in to CheatBook'}
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            {isSignUp ? 'Enter your details to get started' : 'Enter your email and password'}
+    <div className="min-h-screen flex flex-col md:flex-row bg-bg-base">
+      {/* Left decorative panel - Desktop */}
+      <div className="hidden md:flex w-1/2 bg-bg-raised items-center justify-center animate-fade-in">
+        <div className="text-center">
+          <h1 className="text-display-lg font-display font-semibold text-text-primary">
+            CheatBook
+          </h1>
+          <div className="divider-gold w-24 mx-auto my-6" />
+          <p className="text-lg text-text-secondary font-body italic">
+            Where ideas take shape
           </p>
         </div>
+      </div>
 
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-            <span className="block sm:inline">{error}</span>
+      {/* Mobile logo section */}
+      <div className="md:hidden py-12 text-center bg-bg-raised">
+        <h1 className="text-display-md font-display font-semibold text-text-primary">
+          CheatBook
+        </h1>
+        <div className="divider-gold w-16 mx-auto my-4" />
+        <p className="text-base text-text-secondary font-body italic">
+          Where ideas take shape
+        </p>
+      </div>
+
+      {/* Right form panel */}
+      <div className="flex-1 md:w-1/2 flex items-center justify-center bg-bg-base px-6 py-12 md:py-0">
+        <div className="max-w-sm w-full animate-slide-up">
+          <div className="stagger-1">
+            <h2 className="text-display-sm font-display text-text-primary">
+              {isSignUp ? 'Create account' : 'Sign in'}
+            </h2>
+            <p className="text-sm text-text-secondary mt-2 font-body">
+              Enter your credentials
+            </p>
           </div>
-        )}
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {isSignUp && (
-            <div>
-              <label htmlFor="name" className="sr-only">Name</label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                autoComplete="name"
-                className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300
-                          dark:border-gray-700 dark:bg-gray-900 dark:text-white
-                          placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500
-                          focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Name (optional)"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={isSubmitting}
-              />
+          {error && (
+            <div
+              className="mt-6 bg-status-error/10 border border-status-error/20 text-status-error rounded-lg px-4 py-3 text-sm"
+              role="alert"
+            >
+              {error}
             </div>
           )}
 
-          <div>
-            <label htmlFor="email" className="sr-only">Email address</label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300
-                        dark:border-gray-700 dark:bg-gray-900 dark:text-white
-                        placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500
-                        focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="Email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isSubmitting}
-            />
-          </div>
+          <form className="mt-8" onSubmit={handleSubmit}>
+            {isSignUp && (
+              <div className="stagger-1 mb-4">
+                <label htmlFor="name" className="sr-only">
+                  Name
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  autoComplete="name"
+                  className="w-full bg-bg-surface border border-border-default rounded-lg px-4 py-3 text-text-primary placeholder:text-text-tertiary focus:border-accent focus:ring-0 focus:outline-none text-sm font-body"
+                  placeholder="Name (optional)"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={isSubmitting}
+                />
+              </div>
+            )}
 
-          <div>
-            <label htmlFor="password" className="sr-only">Password</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete={isSignUp ? 'new-password' : 'current-password'}
-              required
-              className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300
-                        dark:border-gray-700 dark:bg-gray-900 dark:text-white
-                        placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500
-                        focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isSubmitting}
-            />
-          </div>
+            <div className="stagger-2 mb-4">
+              <label htmlFor="email" className="sr-only">
+                Email address
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="w-full bg-bg-surface border border-border-default rounded-lg px-4 py-3 text-text-primary placeholder:text-text-tertiary focus:border-accent focus:ring-0 focus:outline-none text-sm font-body"
+                placeholder="Email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent
-                        text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700
-                        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500
-                        disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting
-                ? (isSignUp ? 'Creating account...' : 'Signing in...')
-                : (isSignUp ? 'Create account' : 'Sign in')}
-            </button>
-          </div>
+            <div className="stagger-3 mb-6">
+              <label htmlFor="password" className="sr-only">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                required
+                className="w-full bg-bg-surface border border-border-default rounded-lg px-4 py-3 text-text-primary placeholder:text-text-tertiary focus:border-accent focus:ring-0 focus:outline-none text-sm font-body"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
 
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
-              className="text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-            >
-              {isSignUp ? 'Already have an account? Sign in' : "Don\u0027t have an account? Sign up"}
-            </button>
-          </div>
-        </form>
+            <div className="stagger-4">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-4 py-3 text-sm font-body transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting
+                  ? isSignUp
+                    ? 'Creating account...'
+                    : 'Signing in...'
+                  : isSignUp
+                    ? 'Create account'
+                    : 'Sign in'}
+              </button>
+            </div>
+
+            <div className="stagger-5 text-center mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setError(null);
+                }}
+                className="text-sm text-accent hover:text-accent-hover font-body transition"
+              >
+                {isSignUp
+                  ? 'Already have an account? Sign in'
+                  : "Don't have an account? Sign up"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

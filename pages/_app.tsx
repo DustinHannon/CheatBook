@@ -4,6 +4,7 @@ import { AuthProvider } from '../components/AuthContext';
 import { ThemeProvider } from '../components/ThemeProvider';
 import { RealtimeProvider } from '../components/RealtimeContext';
 import '../styles/theme.css';
+import '../styles/editor.css';
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (

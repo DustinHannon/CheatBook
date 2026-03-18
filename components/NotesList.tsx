@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
-import { 
-  PlusIcon, 
-  FolderIcon, 
-  DocumentTextIcon,
+import {
+  PlusIcon,
+  FolderIcon,
   ChevronDownIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  FolderPlusIcon,
+  DocumentPlusIcon,
 } from '@heroicons/react/24/outline';
 
-// Type definitions
 interface NoteType {
   id: string;
   title: string;
@@ -34,42 +32,34 @@ interface NotesListProps {
   notes: NoteType[];
   selectedNoteId?: string;
   selectedNotebookId?: string;
+  onSelectNote?: (noteId: string) => void;
+  onSelectNotebook?: (notebookId: string) => void;
   onCreateNote: () => void;
   onCreateNotebook: () => void;
-  onSelectNotebook?: (notebookId: string) => void;
 }
 
-/**
- * NotesList Component
- * Displays a sidebar list of notebooks and notes
- */
 const NotesList: React.FC<NotesListProps> = ({
   notebooks,
   notes,
   selectedNoteId,
   selectedNotebookId,
+  onSelectNote,
+  onSelectNotebook,
   onCreateNote,
   onCreateNotebook,
-  onSelectNotebook,
 }) => {
-  const router = useRouter();
-  const [expandedNotebooks, setExpandedNotebooks] = useState<{ [key: string]: boolean }>({});
-  const [showAllNotes, setShowAllNotes] = useState(true);
+  const [expandedNotebooks, setExpandedNotebooks] = useState<Record<string, boolean>>({});
+  const [showRecentNotes, setShowRecentNotes] = useState(true);
+  const [showNotebooks, setShowNotebooks] = useState(true);
+  const [showUncategorized, setShowUncategorized] = useState(true);
 
-  // Toggle notebook expansion
   const toggleNotebook = (notebookId: string) => {
-    setExpandedNotebooks(prev => ({
+    setExpandedNotebooks((prev) => ({
       ...prev,
-      [notebookId]: !prev[notebookId]
+      [notebookId]: !prev[notebookId],
     }));
   };
 
-  // Toggle all notes section
-  const toggleAllNotes = () => {
-    setShowAllNotes(!showAllNotes);
-  };
-
-  // Format date as relative time (e.g., "2 hours ago")
   const formatRelativeTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -80,186 +70,239 @@ const NotesList: React.FC<NotesListProps> = ({
     const diffDay = Math.floor(diffHour / 24);
 
     if (diffDay > 0) {
-      return diffDay === 1 ? 'Yesterday' : `${diffDay} days ago`;
+      return diffDay === 1 ? 'Yesterday' : `${diffDay}d ago`;
     } else if (diffHour > 0) {
-      return `${diffHour} hour${diffHour === 1 ? '' : 's'} ago`;
+      return `${diffHour}h ago`;
     } else if (diffMin > 0) {
-      return `${diffMin} minute${diffMin === 1 ? '' : 's'} ago`;
+      return `${diffMin}m ago`;
     } else {
       return 'Just now';
     }
   };
 
-  // Get notes for a specific notebook
   const getNotesForNotebook = (notebookId: string) => {
-    return notes.filter(note => note.notebook_id === notebookId);
+    return notes.filter((note) => note.notebook_id === notebookId);
   };
 
-  // Get notes without a notebook
   const getUncategorizedNotes = () => {
-    return notes.filter(note => !note.notebook_id);
+    return notes.filter((note) => !note.notebook_id);
   };
 
-  // Get recent notes (limited to 5)
   const getRecentNotes = () => {
     return [...notes]
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
       .slice(0, 5);
   };
 
+  const handleSelectNote = (noteId: string) => {
+    if (onSelectNote) {
+      onSelectNote(noteId);
+    }
+  };
+
+  const handleSelectNotebook = (notebookId: string) => {
+    if (onSelectNotebook) {
+      onSelectNotebook(notebookId);
+    }
+  };
+
+  const isNoteSelected = (noteId: string) => selectedNoteId === noteId;
+  const isNotebookSelected = (notebookId: string) => selectedNotebookId === notebookId;
+
   return (
-    <div className="w-full h-full bg-background-secondary border-r border-border overflow-y-auto">
-      {/* Header with actions */}
-      <div className="p-4 flex items-center justify-between border-b border-border">
-        <h2 className="text-lg font-medium text-text-primary">Notes</h2>
-        <div className="flex space-x-2">
+    <div className="w-full h-full bg-bg-raised overflow-y-auto">
+      {/* Header */}
+      <div className="px-5 py-4 flex items-center justify-between">
+        <span className="section-label">LIBRARY</span>
+        <div className="flex items-center gap-1">
           <button
             onClick={onCreateNote}
-            className="p-2 rounded-full bg-primary-light text-primary hover:bg-primary hover:text-white transition-colors"
-            title="Create new note"
+            className="p-1.5 rounded-md text-text-tertiary hover:text-accent hover:bg-bg-surface-hover focus:outline-none"
+            title="New note"
           >
-            <PlusIcon className="h-5 w-5" />
+            <DocumentPlusIcon className="h-4 w-4" />
           </button>
           <button
             onClick={onCreateNotebook}
-            className="p-2 rounded-full bg-primary-light text-primary hover:bg-primary hover:text-white transition-colors"
-            title="Create new notebook"
+            className="p-1.5 rounded-md text-text-tertiary hover:text-accent hover:bg-bg-surface-hover focus:outline-none"
+            title="New notebook"
           >
-            <FolderIcon className="h-5 w-5" />
+            <FolderPlusIcon className="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      {/* Recent Notes Section */}
-      <div className="mb-4">
-        <div 
-          className="flex items-center px-4 py-3 cursor-pointer hover:bg-surface-hover"
-          onClick={toggleAllNotes}
-        >
-          {showAllNotes ? (
-            <ChevronDownIcon className="h-4 w-4 text-text-secondary mr-2" />
-          ) : (
-            <ChevronRightIcon className="h-4 w-4 text-text-secondary mr-2" />
-          )}
-          <span className="font-medium text-text-primary">Recent Notes</span>
-        </div>
+      {/* Gold divider */}
+      <hr className="divider-gold mx-5" />
 
-        {showAllNotes && (
-          <div className="space-y-1 pb-2">
-            {getRecentNotes().map(note => (
-              <Link
-                key={note.id}
-                href={`/notes/${note.id}`}
-                className={`block px-6 py-2 hover:bg-surface-hover ${
-                  selectedNoteId === note.id ? 'bg-surface-active border-l-2 border-primary' : ''
-                }`}
-              >
-                <div className="flex items-center">
-                  <DocumentTextIcon className="h-4 w-4 text-text-secondary mr-2" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">{note.title || 'Untitled'}</p>
-                    <p className="text-xs text-text-tertiary flex items-center">
-                      <span className="truncate">{formatRelativeTime(note.updated_at)}</span>
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+      {/* Recent Notes Section */}
+      <div className="mt-2">
+        <button
+          onClick={() => setShowRecentNotes(!showRecentNotes)}
+          className="w-full flex items-center gap-2 px-5 py-2 hover:bg-bg-surface-hover focus:outline-none"
+        >
+          {showRecentNotes ? (
+            <ChevronDownIcon className="h-3 w-3 text-text-tertiary shrink-0" />
+          ) : (
+            <ChevronRightIcon className="h-3 w-3 text-text-tertiary shrink-0" />
+          )}
+          <span className="section-label">Recent Notes</span>
+        </button>
+
+        <div
+          className={`overflow-hidden transition-all duration-200 ease-out-expo ${
+            showRecentNotes ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          {getRecentNotes().map((note) => (
+            <button
+              key={note.id}
+              onClick={() => handleSelectNote(note.id)}
+              className={`w-full text-left px-5 pl-8 py-2 hover:bg-bg-surface-hover transition-colors ${
+                isNoteSelected(note.id)
+                  ? 'border-l-2 border-accent bg-accent-muted'
+                  : 'border-l-2 border-transparent'
+              }`}
+            >
+              <p className="text-sm font-medium text-text-primary truncate">
+                {note.title || 'Untitled'}
+              </p>
+              <p className="text-xs text-text-tertiary">{formatRelativeTime(note.updated_at)}</p>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Notebooks Section */}
-      <div className="mb-4">
-        <h3 className="px-4 py-2 text-sm font-medium text-text-tertiary uppercase tracking-wider">
-          Notebooks
-        </h3>
-        <div className="space-y-1">
-          {notebooks.map(notebook => (
+      <div className="mt-2">
+        <button
+          onClick={() => setShowNotebooks(!showNotebooks)}
+          className="w-full flex items-center gap-2 px-5 py-2 hover:bg-bg-surface-hover focus:outline-none"
+        >
+          {showNotebooks ? (
+            <ChevronDownIcon className="h-3 w-3 text-text-tertiary shrink-0" />
+          ) : (
+            <ChevronRightIcon className="h-3 w-3 text-text-tertiary shrink-0" />
+          )}
+          <span className="section-label">Notebooks</span>
+        </button>
+
+        <div
+          className={`overflow-hidden transition-all duration-200 ease-out-expo ${
+            showNotebooks ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          {notebooks.map((notebook) => (
             <div key={notebook.id}>
-              <div 
-                className={`flex items-center px-4 py-2 cursor-pointer hover:bg-surface-hover ${
-                  selectedNotebookId === notebook.id ? 'bg-surface-active' : ''
-                }`}
+              {/* Notebook row */}
+              <button
                 onClick={() => {
                   toggleNotebook(notebook.id);
-                  if (onSelectNotebook) {
-                    onSelectNotebook(notebook.id);
-                  }
+                  handleSelectNotebook(notebook.id);
                 }}
+                className={`w-full text-left flex items-center px-5 py-2 hover:bg-bg-surface-hover transition-colors ${
+                  isNotebookSelected(notebook.id)
+                    ? 'border-l-2 border-accent bg-accent-muted'
+                    : 'border-l-2 border-transparent'
+                }`}
               >
                 {expandedNotebooks[notebook.id] ? (
-                  <ChevronDownIcon className="h-4 w-4 text-text-secondary mr-2" />
+                  <ChevronDownIcon className="h-3 w-3 text-text-tertiary mr-2 shrink-0" />
                 ) : (
-                  <ChevronRightIcon className="h-4 w-4 text-text-secondary mr-2" />
+                  <ChevronRightIcon className="h-3 w-3 text-text-tertiary mr-2 shrink-0" />
                 )}
-                <FolderIcon className="h-5 w-5 text-primary mr-2" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary truncate">{notebook.title}</p>
-                </div>
-                <span className="text-xs text-text-tertiary">{notebook.note_count}</span>
-              </div>
+                <FolderIcon className="h-4 w-4 text-accent mr-2 shrink-0" />
+                <span className="text-sm font-medium text-text-primary truncate flex-1">
+                  {notebook.title}
+                </span>
+                <span className="text-xs text-text-tertiary ml-2 shrink-0">
+                  {notebook.note_count}
+                </span>
+              </button>
 
-              {expandedNotebooks[notebook.id] && (
-                <div className="space-y-1 pb-2">
-                  {getNotesForNotebook(notebook.id).map(note => (
-                    <Link
-                      key={note.id}
-                      href={`/notes/${note.id}`}
-                      className={`block pl-10 pr-4 py-2 hover:bg-surface-hover ${
-                        selectedNoteId === note.id ? 'bg-surface-active border-l-2 border-primary' : ''
-                      }`}
-                    >
-                      <div className="flex items-center">
-                        <DocumentTextIcon className="h-4 w-4 text-text-secondary mr-2" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-text-primary truncate">{note.title || 'Untitled'}</p>
-                          <p className="text-xs text-text-tertiary">{formatRelativeTime(note.updated_at)}</p>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+              {/* Expanded notebook notes */}
+              <div
+                className={`overflow-hidden transition-all duration-200 ease-out-expo ${
+                  expandedNotebooks[notebook.id]
+                    ? 'max-h-[1000px] opacity-100'
+                    : 'max-h-0 opacity-0'
+                }`}
+              >
+                {getNotesForNotebook(notebook.id).map((note) => (
                   <button
-                    onClick={() => {
-                      router.push(`/notebooks/${notebook.id}/new`);
-                    }}
-                    className="block w-full text-left pl-10 pr-4 py-2 hover:bg-surface-hover"
+                    key={note.id}
+                    onClick={() => handleSelectNote(note.id)}
+                    className={`w-full text-left px-5 pl-12 py-2 hover:bg-bg-surface-hover transition-colors ${
+                      isNoteSelected(note.id)
+                        ? 'border-l-2 border-accent bg-accent-muted'
+                        : 'border-l-2 border-transparent'
+                    }`}
                   >
-                    <div className="flex items-center text-primary">
-                      <PlusIcon className="h-4 w-4 mr-2" />
-                      <span className="text-sm">Add note</span>
-                    </div>
+                    <p className="text-sm font-medium text-text-primary truncate">
+                      {note.title || 'Untitled'}
+                    </p>
+                    <p className="text-xs text-text-tertiary">
+                      {formatRelativeTime(note.updated_at)}
+                    </p>
                   </button>
-                </div>
-              )}
+                ))}
+
+                {/* Add note button inside notebook */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCreateNote();
+                  }}
+                  className="w-full text-left px-5 pl-12 py-2 hover:bg-bg-surface-hover flex items-center gap-1.5 text-text-tertiary hover:text-accent transition-colors"
+                >
+                  <PlusIcon className="h-3.5 w-3.5" />
+                  <span className="text-xs">Add note</span>
+                </button>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Uncategorized Notes Section */}
-      <div className="mb-4">
-        <h3 className="px-4 py-2 text-sm font-medium text-text-tertiary uppercase tracking-wider">
-          Uncategorized
-        </h3>
-        <div className="space-y-1">
-          {getUncategorizedNotes().map(note => (
-            <Link
+      {/* Uncategorized Section */}
+      <div className="mt-2 mb-4">
+        <button
+          onClick={() => setShowUncategorized(!showUncategorized)}
+          className="w-full flex items-center gap-2 px-5 py-2 hover:bg-bg-surface-hover focus:outline-none"
+        >
+          {showUncategorized ? (
+            <ChevronDownIcon className="h-3 w-3 text-text-tertiary shrink-0" />
+          ) : (
+            <ChevronRightIcon className="h-3 w-3 text-text-tertiary shrink-0" />
+          )}
+          <span className="section-label">Uncategorized</span>
+        </button>
+
+        <div
+          className={`overflow-hidden transition-all duration-200 ease-out-expo ${
+            showUncategorized ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          {getUncategorizedNotes().map((note) => (
+            <button
               key={note.id}
-              href={`/notes/${note.id}`}
-              className={`block px-6 py-2 hover:bg-surface-hover ${
-                selectedNoteId === note.id ? 'bg-surface-active border-l-2 border-primary' : ''
+              onClick={() => handleSelectNote(note.id)}
+              className={`w-full text-left px-5 pl-8 py-2 hover:bg-bg-surface-hover transition-colors ${
+                isNoteSelected(note.id)
+                  ? 'border-l-2 border-accent bg-accent-muted'
+                  : 'border-l-2 border-transparent'
               }`}
             >
-              <div className="flex items-center">
-                <DocumentTextIcon className="h-4 w-4 text-text-secondary mr-2" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary truncate">{note.title || 'Untitled'}</p>
-                  <p className="text-xs text-text-tertiary">{formatRelativeTime(note.updated_at)}</p>
-                </div>
-              </div>
-            </Link>
+              <p className="text-sm font-medium text-text-primary truncate">
+                {note.title || 'Untitled'}
+              </p>
+              <p className="text-xs text-text-tertiary">{formatRelativeTime(note.updated_at)}</p>
+            </button>
           ))}
+
+          {getUncategorizedNotes().length === 0 && (
+            <p className="px-5 pl-8 py-2 text-xs text-text-tertiary">No uncategorized notes</p>
+          )}
         </div>
       </div>
     </div>

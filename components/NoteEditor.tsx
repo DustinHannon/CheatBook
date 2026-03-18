@@ -2,18 +2,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Editor, EditorState, RichUtils, ContentState, convertToRaw, convertFromRaw, SelectionState, Modifier, ContentBlock } from 'draft-js';
 import 'draft-js/dist/Draft.css';
 import {
-  ArrowDownTrayIcon,
   CheckIcon,
-  ExclamationCircleIcon,
-  DocumentDuplicateIcon,
-  ShareIcon,
-  TrashIcon
+  EllipsisHorizontalIcon,
 } from '@heroicons/react/24/outline';
 import UserPresence from './UserPresence';
+import FloatingToolbar from './FloatingToolbar';
 import { useRealtime, getUserColor } from './RealtimeContext';
 import { useAuth } from './AuthContext';
 import { createClient } from '../lib/supabase/client';
-import { updateNote as apiUpdateNote, uploadNoteImage } from '../lib/api';
+import { updateNote as apiUpdateNote } from '../lib/api';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 const supabase = createClient();
@@ -34,10 +31,6 @@ interface ActiveUser {
   name: string;
   color: string;
   last_active: Date;
-  cursor?: {
-    position: number;
-    selection?: { start: number; end: number };
-  };
 }
 
 interface NoteEditorProps {
@@ -67,12 +60,14 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   const [typingUsers, setTypingUsers] = useState<ActiveUser[]>([]);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const [imageUploads, setImageUploads] = useState<Record<string, any>>({});
+  const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   const { user } = useAuth();
   const { joinNote, leaveNote } = useRealtime();
 
   const editorRef = useRef<Editor>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
   const lastSelectionState = useRef<SelectionState | null>(null);
   const throttleRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -86,7 +81,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     channelRef.current = channel;
     setIsConnected(true);
 
-    // Listen for presence changes
     channel.on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState();
       const users: ActiveUser[] = [];
@@ -98,7 +92,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               name: presence.user_name,
               color: presence.color,
               last_active: new Date(presence.online_at),
-              cursor: presence.cursor_position ? { position: presence.cursor_position } : undefined,
             });
           }
         }
@@ -106,25 +99,19 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       setActiveUsers(users);
     });
 
-    // Listen for broadcast content changes from other users
     channel.on('broadcast', { event: 'content-change' }, (payload: any) => {
       const data = payload.payload;
       if (data.userId === user.id) return;
-
       try {
         isRemoteUpdate.current = true;
         const contentState = convertFromRaw(JSON.parse(data.content));
         const newEditorState = EditorState.createWithContent(contentState);
-
         if (lastSelectionState.current) {
           setEditorState(EditorState.forceSelection(newEditorState, lastSelectionState.current));
         } else {
           setEditorState(newEditorState);
         }
-
-        if (data.title) {
-          setTitle(data.title);
-        }
+        if (data.title) setTitle(data.title);
         setDocVersion(data.version || docVersion);
         setSaveStatus('saved');
         setLocalChanges(false);
@@ -135,57 +122,21 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       }
     });
 
-    // Listen for typing status
     channel.on('broadcast', { event: 'typing-status' }, (payload: any) => {
       const data = payload.payload;
       if (data.userId === user.id) return;
-
       setTypingUsers(prev => {
         if (data.isTyping) {
-          const exists = prev.find(u => u.id === data.userId);
-          if (exists) return prev;
-          return [...prev, {
-            id: data.userId,
-            name: data.userName,
-            color: getUserColor(data.userId),
-            last_active: new Date(),
-          }];
-        } else {
-          return prev.filter(u => u.id !== data.userId);
+          if (prev.find(u => u.id === data.userId)) return prev;
+          return [...prev, { id: data.userId, name: data.userName, color: getUserColor(data.userId), last_active: new Date() }];
         }
+        return prev.filter(u => u.id !== data.userId);
       });
     });
 
-    // Listen for image upload notifications
-    channel.on('broadcast', { event: 'image-upload' }, (payload: any) => {
-      const data = payload.payload;
-      if (data.userId === user.id) return;
-
-      setImageUploads(prev => ({
-        ...prev,
-        [data.imageId]: data,
-      }));
-
-      if (data.status === 'complete' && data.url) {
-        insertImageAtPosition(data.url, data.insertPosition || 0);
-        setTimeout(() => {
-          setImageUploads(prev => {
-            const next = { ...prev };
-            delete next[data.imageId];
-            return next;
-          });
-        }, 2000);
-      }
-    });
-
-    // Listen for DB changes (fallback sync)
     channel.on('postgres_changes', {
-      event: 'UPDATE',
-      schema: 'public',
-      table: 'notes',
-      filter: `id=eq.${note.id}`,
+      event: 'UPDATE', schema: 'public', table: 'notes', filter: `id=eq.${note.id}`,
     }, (payload: any) => {
-      // Only apply if we don't have local changes
       if (!localChanges && payload.new) {
         setDocVersion(payload.new.version || 1);
       }
@@ -196,13 +147,13 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       channelRef.current = null;
       leaveNote(note.id);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id, user?.id]);
 
   // Initialize editor when note changes
   useEffect(() => {
     if (note) {
-      setTitle(note.title || 'Untitled');
+      setTitle(note.title || '');
       try {
         if (note.content) {
           const contentState = convertFromRaw(JSON.parse(note.content));
@@ -210,20 +161,17 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
         } else {
           setEditorState(EditorState.createEmpty());
         }
-      } catch (error) {
-        console.error('Error parsing note content:', error);
-        setEditorState(EditorState.createWithContent(
-          ContentState.createFromText(note.content || '')
-        ));
+      } catch {
+        setEditorState(EditorState.createWithContent(ContentState.createFromText(note.content || '')));
       }
       setDocVersion(note.version || 1);
       setSaveStatus('saved');
       setLocalChanges(false);
     } else {
-      setTitle('Untitled');
+      setTitle('');
       setEditorState(EditorState.createEmpty());
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id]);
 
   // Auto-save
@@ -231,121 +179,52 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     if (!note || readOnly) return;
     if (saveTimer) clearTimeout(saveTimer);
     if (saveStatus === 'saved') return;
-
     setSaveStatus('unsaved');
     setLocalChanges(true);
-
-    const timer = setTimeout(() => {
-      handleSave();
-    }, 2000);
+    const timer = setTimeout(() => { handleSave(); }, 2000);
     setSaveTimer(timer);
-
     return () => { if (saveTimer) clearTimeout(saveTimer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, editorState]);
 
-  // Broadcast cursor/typing via presence updates
+  // Track selection for floating toolbar
   useEffect(() => {
+    const selection = editorState.getSelection();
+    const hasSelection = !selection.isCollapsed();
+    setShowFloatingToolbar(hasSelection);
+    lastSelectionState.current = selection;
+
     if (!channelRef.current || !note?.id || readOnly || !user) return;
-
-    const currentSelection = editorState.getSelection();
-    lastSelectionState.current = currentSelection;
-
     if (throttleRef.current) clearTimeout(throttleRef.current);
-
     throttleRef.current = setTimeout(() => {
-      const nowTyping = saveStatus === 'unsaved';
       channelRef.current?.send({
-        type: 'broadcast',
-        event: 'typing-status',
-        payload: {
-          userId: user.id,
-          userName: user.name,
-          isTyping: nowTyping,
-        },
+        type: 'broadcast', event: 'typing-status',
+        payload: { userId: user.id, userName: user.name, isTyping: saveStatus === 'unsaved' },
       });
     }, 100);
-
     return () => { if (throttleRef.current) clearTimeout(throttleRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorState, note?.id, saveStatus]);
 
-  const insertImageAtPosition = (imageUrl: string, position: number) => {
-    try {
-      const contentState = editorState.getCurrentContent();
-      const blockMap = contentState.getBlockMap();
-      let targetBlock: ContentBlock | undefined;
-      let targetOffset: number | undefined;
-      let currentPosition = 0;
-
-      blockMap.forEach((block: ContentBlock | undefined) => {
-        if (block && !targetBlock && currentPosition + block.getLength() >= position) {
-          targetBlock = block;
-          targetOffset = position - currentPosition;
-        }
-        if (block) currentPosition += block.getLength() + 1;
-      });
-
-      if (targetBlock && targetOffset !== undefined) {
-        const targetKey = targetBlock.getKey();
-        const selectionState = SelectionState.createEmpty(targetKey).merge({
-          anchorOffset: targetOffset,
-          focusOffset: targetOffset,
-        });
-
-        const textWithImage = `![Image](${imageUrl})`;
-        const contentWithImage = Modifier.insertText(contentState, selectionState, textWithImage);
-        const newEditorState = EditorState.push(editorState, contentWithImage, 'insert-characters');
-        setEditorState(newEditorState);
-      }
-    } catch (error) {
-      console.error('Error inserting image:', error);
-    }
-  };
-
   const handleKeyCommand = (command: string, editorState: EditorState) => {
     const newState = RichUtils.handleKeyCommand(editorState, command);
-    if (newState) {
-      setEditorState(newState);
-      return 'handled';
-    }
+    if (newState) { setEditorState(newState); return 'handled'; }
     return 'not-handled';
   };
 
   const handleSave = async () => {
     if (!note || readOnly) return;
-
     setSaveStatus('saving');
     setIsSaving(true);
-
     try {
       const contentState = editorState.getCurrentContent();
       const rawContent = JSON.stringify(convertToRaw(contentState));
-
-      // Save to Supabase
-      const updated = await apiUpdateNote(supabase, note.id, {
-        title,
-        content: rawContent,
-        version: docVersion + 1,
-      });
-
-      // Broadcast to other users
+      const updated = await apiUpdateNote(supabase, note.id, { title, content: rawContent, version: docVersion + 1 });
       channelRef.current?.send({
-        type: 'broadcast',
-        event: 'content-change',
-        payload: {
-          userId: user?.id,
-          content: rawContent,
-          title,
-          version: updated.version,
-        },
+        type: 'broadcast', event: 'content-change',
+        payload: { userId: user?.id, content: rawContent, title, version: updated.version },
       });
-
-      // Notify parent
-      if (onSave) {
-        onSave({ id: note.id, title, content: rawContent });
-      }
-
+      if (onSave) onSave({ id: note.id, title, content: rawContent });
       setSaveStatus('saved');
       setLocalChanges(false);
       setDocVersion(updated.version || docVersion + 1);
@@ -357,46 +236,26 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     }
   };
 
-  const broadcastChanges = useCallback(
-    (editorState: EditorState) => {
-      if (!channelRef.current || !note?.id || !user) return;
-
-      const contentState = editorState.getCurrentContent();
-      const rawContent = JSON.stringify(convertToRaw(contentState));
-
-      channelRef.current.send({
-        type: 'broadcast',
-        event: 'content-change',
-        payload: {
-          userId: user.id,
-          content: rawContent,
-          title,
-          version: docVersion,
-        },
-      });
-    },
+  const broadcastChanges = useCallback((editorState: EditorState) => {
+    if (!channelRef.current || !note?.id || !user) return;
+    const rawContent = JSON.stringify(convertToRaw(editorState.getCurrentContent()));
+    channelRef.current.send({
+      type: 'broadcast', event: 'content-change',
+      payload: { userId: user.id, content: rawContent, title, version: docVersion },
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [note?.id, user?.id, docVersion, title]
-  );
+  }, [note?.id, user?.id, docVersion, title]);
 
-  const handleEditorChange = useCallback(
-    (newEditorState: EditorState) => {
-      setEditorState(newEditorState);
-
-      if (isRemoteUpdate.current) return;
-
-      const currentContent = editorState.getCurrentContent();
-      const newContent = newEditorState.getCurrentContent();
-
-      if (currentContent !== newContent) {
-        if (throttleRef.current) clearTimeout(throttleRef.current);
-        throttleRef.current = setTimeout(() => {
-          broadcastChanges(newEditorState);
-        }, 300);
-      }
-    },
-    [editorState, broadcastChanges]
-  );
+  const handleEditorChange = useCallback((newEditorState: EditorState) => {
+    setEditorState(newEditorState);
+    if (isRemoteUpdate.current) return;
+    const currentContent = editorState.getCurrentContent();
+    const newContent = newEditorState.getCurrentContent();
+    if (currentContent !== newContent) {
+      if (throttleRef.current) clearTimeout(throttleRef.current);
+      throttleRef.current = setTimeout(() => { broadcastChanges(newEditorState); }, 300);
+    }
+  }, [editorState, broadcastChanges]);
 
   const toggleInlineStyle = (style: string) => {
     setEditorState(RichUtils.toggleInlineStyle(editorState, style));
@@ -406,221 +265,130 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     setEditorState(RichUtils.toggleBlockType(editorState, blockType));
   };
 
-  const handlePaste = (text: string, html: string | undefined, editorState: EditorState): 'handled' | 'not-handled' => {
-    return 'not-handled';
-  };
+  const focusEditor = () => { editorRef.current?.focus(); };
 
-  const focusEditor = () => {
-    if (editorRef.current) editorRef.current.focus();
-  };
+  const currentInlineStyles = editorState.getCurrentInlineStyle();
+  const currentBlockType = RichUtils.getCurrentBlockType(editorState);
 
   return (
-    <div className="flex flex-col h-full bg-background-primary">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between p-2 border-b border-border bg-surface">
-        <div className="flex space-x-2">
-          <button
-            onClick={() => toggleInlineStyle('BOLD')}
-            className={`p-1.5 rounded ${
-              editorState.getCurrentInlineStyle().has('BOLD')
-                ? 'bg-primary-light text-primary'
-                : 'text-text-secondary hover:bg-surface-hover'
-            }`}
-          >
-            <span className="font-bold">B</span>
-          </button>
-          <button
-            onClick={() => toggleInlineStyle('ITALIC')}
-            className={`p-1.5 rounded ${
-              editorState.getCurrentInlineStyle().has('ITALIC')
-                ? 'bg-primary-light text-primary'
-                : 'text-text-secondary hover:bg-surface-hover'
-            }`}
-          >
-            <span className="italic">I</span>
-          </button>
-          <button
-            onClick={() => toggleInlineStyle('UNDERLINE')}
-            className={`p-1.5 rounded ${
-              editorState.getCurrentInlineStyle().has('UNDERLINE')
-                ? 'bg-primary-light text-primary'
-                : 'text-text-secondary hover:bg-surface-hover'
-            }`}
-          >
-            <span className="underline">U</span>
-          </button>
-          <div className="h-6 mx-2 border-r border-border" />
-          <button
-            onClick={() => toggleBlockType('header-one')}
-            className={`p-1.5 rounded text-sm ${
-              RichUtils.getCurrentBlockType(editorState) === 'header-one'
-                ? 'bg-primary-light text-primary'
-                : 'text-text-secondary hover:bg-surface-hover'
-            }`}
-          >
-            H1
-          </button>
-          <button
-            onClick={() => toggleBlockType('header-two')}
-            className={`p-1.5 rounded text-sm ${
-              RichUtils.getCurrentBlockType(editorState) === 'header-two'
-                ? 'bg-primary-light text-primary'
-                : 'text-text-secondary hover:bg-surface-hover'
-            }`}
-          >
-            H2
-          </button>
-          <button
-            onClick={() => toggleBlockType('unordered-list-item')}
-            className={`p-1.5 rounded text-sm ${
-              RichUtils.getCurrentBlockType(editorState) === 'unordered-list-item'
-                ? 'bg-primary-light text-primary'
-                : 'text-text-secondary hover:bg-surface-hover'
-            }`}
-          >
-            • List
-          </button>
-          <button
-            onClick={() => toggleBlockType('ordered-list-item')}
-            className={`p-1.5 rounded text-sm ${
-              RichUtils.getCurrentBlockType(editorState) === 'ordered-list-item'
-                ? 'bg-primary-light text-primary'
-                : 'text-text-secondary hover:bg-surface-hover'
-            }`}
-          >
-            1. List
-          </button>
-        </div>
-
-        {/* Right side toolbar */}
-        <div className="flex items-center space-x-2">
-          {/* Connection status */}
-          <div className="mr-2">
-            <span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-success' : 'bg-red-500'}`}></span>
-            <span className="ml-1 text-xs text-text-secondary">
-              {isConnected ? 'Connected' : 'Offline'}
-            </span>
-          </div>
-
-          {/* Active users */}
-          <div className="flex items-center mr-4">
-            {activeUsers.map((u) => (
-              <UserPresence key={u.id} user={u} />
-            ))}
+    <div className="flex flex-col h-full bg-bg-base relative">
+      {/* Top bar — subtle, minimal */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-border-subtle">
+        <div className="flex items-center gap-3">
+          {/* Connection + save status */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-status-success' : 'bg-status-error'}`} />
+            {saveStatus === 'saved' && (
+              <span className="text-text-tertiary flex items-center gap-1">
+                <CheckIcon className="w-3 h-3" /> Saved
+              </span>
+            )}
+            {saveStatus === 'saving' && (
+              <span className="text-accent animate-pulse-gold">Saving...</span>
+            )}
+            {saveStatus === 'unsaved' && (
+              <span className="text-text-tertiary">Unsaved</span>
+            )}
+            {saveStatus === 'error' && (
+              <span className="text-status-error">Error saving</span>
+            )}
           </div>
 
           {/* Typing indicators */}
           {typingUsers.length > 0 && (
-            <div className="text-xs text-text-secondary mr-3 italic">
-              {typingUsers.length === 1
-                ? `${typingUsers[0].name} is typing...`
-                : `${typingUsers.length} users are typing...`}
-            </div>
+            <span className="text-xs text-text-tertiary italic">
+              {typingUsers.length === 1 ? `${typingUsers[0].name} is typing...` : `${typingUsers.length} typing...`}
+            </span>
           )}
+        </div>
 
-          {/* Save status */}
-          <div className="flex items-center text-sm mr-2">
-            {saveStatus === 'unsaved' && (
-              <span className="text-text-tertiary">Unsaved changes</span>
-            )}
-            {saveStatus === 'saving' && (
-              <span className="text-yellow-500 flex items-center">
-                <ArrowDownTrayIcon className="h-4 w-4 mr-1 animate-pulse" />
-                Saving...
-              </span>
-            )}
-            {saveStatus === 'saved' && (
-              <span className="text-green-500 flex items-center">
-                <CheckIcon className="h-4 w-4 mr-1" />
-                Saved
-              </span>
-            )}
-            {saveStatus === 'error' && (
-              <span className="text-red-500 flex items-center">
-                <ExclamationCircleIcon className="h-4 w-4 mr-1" />
-                Error saving
-              </span>
-            )}
-          </div>
+        <div className="flex items-center gap-2">
+          {/* Active users */}
+          {activeUsers.map(u => (
+            <UserPresence key={u.id} user={u} size="small" />
+          ))}
 
-          {/* Action buttons */}
-          {note && (
-            <>
-              {onShare && (
-                <button
-                  onClick={() => onShare(note.id)}
-                  className="p-1.5 rounded text-text-secondary hover:bg-surface-hover"
-                  title="Share note"
-                >
-                  <ShareIcon className="h-5 w-5" />
-                </button>
+          {/* More menu */}
+          {note && (onDelete || onShare || onDuplicate) && (
+            <div className="relative">
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-surface-hover transition-colors"
+              >
+                <EllipsisHorizontalIcon className="w-5 h-5" />
+              </button>
+              {showMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-bg-surface border border-border-default rounded-lg shadow-lg py-1 min-w-[160px] animate-fade-in">
+                    {onShare && (
+                      <button onClick={() => { onShare(note.id); setShowMenu(false); }}
+                        className="w-full text-left px-4 py-2 text-sm text-text-body hover:bg-bg-surface-hover">
+                        Share
+                      </button>
+                    )}
+                    {onDuplicate && (
+                      <button onClick={() => { onDuplicate(note.id); setShowMenu(false); }}
+                        className="w-full text-left px-4 py-2 text-sm text-text-body hover:bg-bg-surface-hover">
+                        Duplicate
+                      </button>
+                    )}
+                    {onDelete && (
+                      <>
+                        <div className="my-1 border-t border-border-subtle" />
+                        <button onClick={() => { onDelete(note.id); setShowMenu(false); }}
+                          className="w-full text-left px-4 py-2 text-sm text-status-error hover:bg-bg-surface-hover">
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
               )}
-              {onDuplicate && (
-                <button
-                  onClick={() => onDuplicate(note.id)}
-                  className="p-1.5 rounded text-text-secondary hover:bg-surface-hover"
-                  title="Duplicate note"
-                >
-                  <DocumentDuplicateIcon className="h-5 w-5" />
-                </button>
-              )}
-              {onDelete && (
-                <button
-                  onClick={() => onDelete(note.id)}
-                  className="p-1.5 rounded text-text-secondary hover:bg-surface-hover"
-                  title="Delete note"
-                >
-                  <TrashIcon className="h-5 w-5" />
-                </button>
-              )}
-            </>
+            </div>
           )}
         </div>
       </div>
 
+      {/* Floating toolbar */}
+      <FloatingToolbar
+        editorRef={editorContainerRef}
+        onToggleInlineStyle={toggleInlineStyle}
+        onToggleBlockType={toggleBlockType}
+        currentInlineStyles={new Set(currentInlineStyles.toArray())}
+        currentBlockType={currentBlockType}
+        isVisible={showFloatingToolbar}
+      />
+
       {/* Editor content */}
-      <div className="flex-1 overflow-y-auto p-4" onClick={focusEditor}>
-        {/* Title */}
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => {
-            setTitle(e.target.value);
-            setSaveStatus('unsaved');
-          }}
-          placeholder="Untitled"
-          className="w-full text-2xl font-bold mb-4 bg-transparent border-none outline-none text-text-primary"
-          readOnly={readOnly}
-        />
-
-        {/* Image upload progress indicators */}
-        {Object.values(imageUploads).map((upload: any) => (
-          <div key={upload.imageId} className="mb-2 bg-surface rounded p-2 text-sm">
-            <div className="flex justify-between">
-              <span>{upload.fileName || 'Uploading...'}</span>
-              <span>{upload.progress || 0}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5 mt-1">
-              <div
-                className="bg-primary h-2.5 rounded-full"
-                style={{ width: `${upload.progress || 0}%` }}
-              ></div>
-            </div>
-          </div>
-        ))}
-
-        {/* Rich text editor */}
-        <div className="prose prose-sm max-w-none">
-          <Editor
-            ref={editorRef}
-            editorState={editorState}
-            onChange={handleEditorChange}
-            handleKeyCommand={handleKeyCommand}
-            handlePastedText={handlePaste}
-            placeholder="Start writing..."
+      <div
+        ref={editorContainerRef}
+        className="flex-1 overflow-y-auto"
+        onClick={focusEditor}
+      >
+        <div className="max-w-[720px] mx-auto px-6 md:px-12 pt-10 pb-32">
+          {/* Title */}
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => { setTitle(e.target.value); setSaveStatus('unsaved'); }}
+            placeholder="Untitled"
+            className="w-full text-display-md bg-transparent border-none outline-none placeholder:text-text-tertiary mb-8"
             readOnly={readOnly}
-            spellCheck={true}
           />
+
+          {/* Rich text editor */}
+          <div className="prose-editorial">
+            <Editor
+              ref={editorRef}
+              editorState={editorState}
+              onChange={handleEditorChange}
+              handleKeyCommand={handleKeyCommand}
+              placeholder="Start writing..."
+              readOnly={readOnly}
+              spellCheck={true}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -2,108 +2,218 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Theme CSS Variables
- * This file contains CSS variables for light and dark themes
- */
+/* ═══════════════════════════════════════════
+   CheatBook Design System — Dark & Editorial
+   ═══════════════════════════════════════════ */
 
 :root {
-  /* Light Theme (Default) */
-  --background-primary: #ffffff;
-  --background-secondary: #f5f5f5;
-  --background-tertiary: #eaeaea;
-  --surface: #ffffff;
-  --surface-hover: #f0f0f0;
-  --surface-active: #e8e8e8;
-  --border: #e0e0e0;
-  --divider: #eeeeee;
-  
-  /* Text colors */
-  --text-primary: #121212;
-  --text-secondary: #5f5f5f;
-  --text-tertiary: #8a8a8a;
-  --text-disabled: #b0b0b0;
-  
-  /* Accent colors */
-  --primary: #5c6ac4;
-  --primary-hover: #4959b9;
-  --primary-light: #eef0fa;
-  --secondary: #10b981;
-  --secondary-hover: #0d9668;
-  --secondary-light: #e7f9f3;
-  --error: #e53935;
-  --warning: #f59e0b;
-  --info: #3b82f6;
-  
-  /* Status colors */
-  --online: #22c55e;
-  --away: #f59e0b;
-  --busy: #e11d48;
-  
-  /* UI elements */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-full: 9999px;
-  
-  /* Spacing */
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --spacing-xxl: 48px;
-  
+  /* Backgrounds */
+  --bg-base: #0a0a0b;
+  --bg-raised: #111113;
+  --bg-surface: #18181b;
+  --bg-surface-hover: #1f1f23;
+  --bg-surface-active: #27272a;
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+
+  /* Text */
+  --text-primary: #fafafa;
+  --text-body: #e4e4e7;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  --text-disabled: #52525b;
+
+  /* Accent (warm gold) */
+  --accent: #d4a574;
+  --accent-hover: #e0b88a;
+  --accent-muted: rgba(212, 165, 116, 0.15);
+  --accent-line: rgba(212, 165, 116, 0.3);
+
+  /* Borders */
+  --border-subtle: #1f1f23;
+  --border-default: #27272a;
+  --border-emphasis: #3f3f46;
+
+  /* Status */
+  --status-success: #22c55e;
+  --status-warning: #f59e0b;
+  --status-error: #ef4444;
+  --status-info: #60a5fa;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 20px rgba(212, 165, 116, 0.1);
+
   /* Animation */
-  --transition: 200ms ease;
-  
-  /* Other */
-  --header-height: 60px;
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+
+  /* Layout */
+  --header-height: 52px;
   --sidebar-width: 280px;
-  --sidebar-collapsed-width: 72px;
 }
 
-[data-theme="dark"] {
-  /* Dark Theme */
-  --background-primary: #121212;
-  --background-secondary: #1e1e1e;
-  --background-tertiary: #2a2a2a;
-  --surface: #242424;
-  --surface-hover: #2f2f2f;
-  --surface-active: #363636;
-  --border: #404040;
-  --divider: #333333;
-  
-  /* Text colors */
-  --text-primary: #f8f8f8;
-  --text-secondary: #c7c7c7;
-  --text-tertiary: #a0a0a0;
-  --text-disabled: #6b6b6b;
-  
-  /* Accent colors - brightened for dark theme */
-  --primary: #7C8CE4;
-  --primary-hover: #8C9DF1;
-  --primary-light: #262c47;
-  --secondary: #34d399;
-  --secondary-hover: #3fe2a7;
-  --secondary-light: #1a352c;
-  
-  /* UI elements - adjusted for dark theme */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
-}
+/* ── Global ────────────────────────────── */
 
-/* Global styles */
 body {
-  background-color: var(--background-primary);
-  color: var(--text-primary);
-  transition: background-color var(--transition), color var(--transition);
+  background-color: var(--bg-base);
+  color: var(--text-body);
+  font-family: 'DM Sans', system-ui, sans-serif;
 }
 
-/* Apply smooth transitions to theme changes */
-*, *::before, *::after {
-  transition: background-color var(--transition), border-color var(--transition), color var(--transition), box-shadow var(--transition);
-} 
+/* Noise grain overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+  mix-blend-mode: overlay;
+}
+
+/* ── Scrollbar ─────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-emphasis);
+}
+
+/* ── Focus rings ───────────────────────── */
+
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-muted), 0 0 0 3px var(--accent);
+}
+
+/* ── Selection ─────────────────────────── */
+
+::selection {
+  background: var(--accent-muted);
+  color: var(--text-primary);
+}
+
+/* ── Transitions ───────────────────────── */
+
+a, button, input, textarea, select {
+  transition: color var(--duration-fast) var(--ease-out),
+              background-color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out),
+              opacity var(--duration-fast) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out);
+}
+
+/* ── Gold divider utility ──────────────── */
+
+.divider-gold {
+  border: none;
+  height: 1px;
+  background: var(--accent-line);
+}
+
+/* ── Typography utilities ──────────────── */
+
+.text-display-lg {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 3rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.text-display-md {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--text-primary);
+}
+
+.text-display-sm {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.section-label {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* ── Animations ────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulseGold {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-fade-in {
+  animation: fadeIn var(--duration-slow) var(--ease-out) both;
+}
+
+.animate-slide-up {
+  animation: slideUp var(--duration-slow) var(--ease-out) both;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft var(--duration-normal) var(--ease-out) both;
+}
+
+.animate-pulse-gold {
+  animation: pulseGold 2s var(--ease-in-out) infinite;
+}
+
+/* Stagger delays */
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
