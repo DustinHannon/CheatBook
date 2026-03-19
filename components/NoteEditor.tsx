@@ -241,26 +241,28 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id]);
 
-  // Auto-save
+  // Auto-save (triggered when saveStatus changes to unsaved)
   useEffect(() => {
-    if (!note || effectiveReadOnly || saveStatus === 'saved') return;
+    if (!note || effectiveReadOnly || saveStatus !== 'unsaved') return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setLocalChanges(true);
     saveTimerRef.current = setTimeout(() => { handleSave(); }, 2000);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content]);
+  }, [saveStatus, title]);
 
   const handleSave = async () => {
     if (!note || effectiveReadOnly) return;
     setSaveStatus('saving');
+    // Read latest content from TinyMCE editor instance
+    const currentContent = editorRef.current ? editorRef.current.getContent() : contentRef.current;
     try {
-      const updated = await apiUpdateNote(supabase, note.id, { title, content: contentRef.current, version: docVersion + 1 });
+      const updated = await apiUpdateNote(supabase, note.id, { title, content: currentContent, version: docVersion + 1 });
       channelRef.current?.send({
         type: 'broadcast', event: 'content-change',
-        payload: { userId: user?.id, content: contentRef.current, title, version: updated.version },
+        payload: { userId: user?.id, content: currentContent, title, version: updated.version },
       });
-      if (onSave) onSave({ id: note.id, title, content: contentRef.current });
+      if (onSave) onSave({ id: note.id, title, content: currentContent });
       setSaveStatus('saved');
       setLocalChanges(false);
       setDocVersion(updated.version || docVersion + 1);
@@ -272,7 +274,9 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
 
   const handleEditorChange = useCallback((newContent: string) => {
     if (isRemoteUpdate.current) return;
-    setContent(newContent);
+    // Don't set React state for content — let TinyMCE manage it internally
+    // Just update the ref for saving and mark as unsaved
+    contentRef.current = newContent;
     setSaveStatus('unsaved');
     channelRef.current?.send({
       type: 'broadcast', event: 'typing-status',
