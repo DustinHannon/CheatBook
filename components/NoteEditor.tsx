@@ -4,13 +4,26 @@ import 'draft-js/dist/Draft.css';
 import {
   CheckIcon,
   EllipsisHorizontalIcon,
+  LockClosedIcon,
 } from '@heroicons/react/24/outline';
 import UserPresence from './UserPresence';
 import FloatingToolbar from './FloatingToolbar';
+import CategoryBadge from './CategoryBadge';
+import CategoryPicker from './CategoryPicker';
 import { useRealtime, getUserColor } from './RealtimeContext';
 import { useAuth } from './AuthContext';
 import { createClient } from '../lib/supabase/client';
-import { updateNote as apiUpdateNote } from '../lib/api';
+import {
+  updateNote as apiUpdateNote,
+  pinNote,
+  unpinNote,
+  lockNote,
+  unlockNote,
+  hideNote,
+  addNoteCategory,
+  removeNoteCategory,
+} from '../lib/api';
+import type { Category } from '../lib/api';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 const supabase = createClient();
@@ -24,6 +37,12 @@ interface NoteType {
   owner_name?: string;
   notebook_id: string | null;
   version?: number;
+  is_locked: boolean;
+  locked_by: string | null;
+  is_pinned: boolean;
+  last_edited_by: string | null;
+  last_edited_by_name?: string;
+  categories?: Array<{ id: string; name: string; color: string }>;
 }
 
 interface ActiveUser {
@@ -40,6 +59,24 @@ interface NoteEditorProps {
   onShare?: (noteId: string) => void;
   onDuplicate?: (noteId: string) => void;
   readOnly?: boolean;
+  allCategories?: Category[];
+}
+
+function relativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return 'just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 30) return `${diffDay}d ago`;
+  const diffMonth = Math.floor(diffDay / 30);
+  if (diffMonth < 12) return `${diffMonth}mo ago`;
+  return `${Math.floor(diffMonth / 12)}y ago`;
 }
 
 const NoteEditor: React.FC<NoteEditorProps> = ({
@@ -49,6 +86,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   onShare,
   onDuplicate,
   readOnly = false,
+  allCategories = [],
 }) => {
   const [title, setTitle] = useState('');
   const [editorState, setEditorState] = useState(EditorState.createEmpty());
@@ -63,6 +101,12 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
+  // New state for enhancements
+  const [isPinned, setIsPinned] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [overrideLock, setOverrideLock] = useState(false);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; color: string }>>([]);
+
   const { user } = useAuth();
   const { joinNote, leaveNote } = useRealtime();
 
@@ -72,6 +116,9 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   const throttleRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const isRemoteUpdate = useRef(false);
+
+  // Compute effective readOnly: locked and not overridden, or prop
+  const effectiveReadOnly = readOnly || (isLocked && !overrideLock);
 
   // Set up Supabase Realtime channel
   useEffect(() => {
@@ -167,16 +214,24 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       setDocVersion(note.version || 1);
       setSaveStatus('saved');
       setLocalChanges(false);
+      setIsPinned(!!note.is_pinned);
+      setIsLocked(!!note.is_locked);
+      setOverrideLock(false);
+      setCategories(note.categories || []);
     } else {
       setTitle('');
       setEditorState(EditorState.createEmpty());
+      setIsPinned(false);
+      setIsLocked(false);
+      setOverrideLock(false);
+      setCategories([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id]);
 
   // Auto-save
   useEffect(() => {
-    if (!note || readOnly) return;
+    if (!note || effectiveReadOnly) return;
     if (saveTimer) clearTimeout(saveTimer);
     if (saveStatus === 'saved') return;
     setSaveStatus('unsaved');
@@ -194,7 +249,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     setShowFloatingToolbar(hasSelection);
     lastSelectionState.current = selection;
 
-    if (!channelRef.current || !note?.id || readOnly || !user) return;
+    if (!channelRef.current || !note?.id || effectiveReadOnly || !user) return;
     if (throttleRef.current) clearTimeout(throttleRef.current);
     throttleRef.current = setTimeout(() => {
       channelRef.current?.send({
@@ -213,7 +268,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   };
 
   const handleSave = async () => {
-    if (!note || readOnly) return;
+    if (!note || effectiveReadOnly) return;
     setSaveStatus('saving');
     setIsSaving(true);
     try {
@@ -267,6 +322,72 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
 
   const focusEditor = () => { editorRef.current?.focus(); };
 
+  // Pin/Unpin handler
+  const handleTogglePin = async () => {
+    if (!note) return;
+    try {
+      if (isPinned) {
+        await unpinNote(supabase, note.id);
+        setIsPinned(false);
+      } else {
+        await pinNote(supabase, note.id);
+        setIsPinned(true);
+      }
+    } catch (error) {
+      console.error('Error toggling pin:', error);
+    }
+    setShowMenu(false);
+  };
+
+  // Lock/Unlock handler
+  const handleToggleLock = async () => {
+    if (!note) return;
+    try {
+      if (isLocked) {
+        await unlockNote(supabase, note.id);
+        setIsLocked(false);
+        setOverrideLock(false);
+      } else {
+        await lockNote(supabase, note.id);
+        setIsLocked(true);
+        setOverrideLock(false);
+      }
+    } catch (error) {
+      console.error('Error toggling lock:', error);
+    }
+    setShowMenu(false);
+  };
+
+  // Hide handler
+  const handleHide = async () => {
+    if (!note) return;
+    try {
+      await hideNote(supabase, note.id);
+    } catch (error) {
+      console.error('Error hiding note:', error);
+    }
+    setShowMenu(false);
+  };
+
+  // Category toggle handler
+  const handleCategoryToggle = async (categoryId: string, isAdding: boolean) => {
+    if (!note) return;
+    try {
+      if (isAdding) {
+        await addNoteCategory(supabase, note.id, categoryId);
+        const cat = allCategories.find((c) => c.id === categoryId);
+        if (cat) {
+          setCategories((prev) => [...prev, { id: cat.id, name: cat.name, color: cat.color }]);
+        }
+      } else {
+        await removeNoteCategory(supabase, note.id, categoryId);
+        setCategories((prev) => prev.filter((c) => c.id !== categoryId));
+      }
+    } catch (error) {
+      console.error('Error toggling category:', error);
+    }
+  };
+
   const currentInlineStyles = editorState.getCurrentInlineStyle();
   const currentBlockType = RichUtils.getCurrentBlockType(editorState);
 
@@ -293,6 +414,16 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               <span className="text-status-error">Error saving</span>
             )}
           </div>
+
+          {/* Metadata line */}
+          {note && (
+            <span className="text-xs text-text-tertiary">
+              {note.owner_name && `Created by ${note.owner_name}`}
+              {note.last_edited_by_name && note.updated_at && (
+                <> &middot; Edited by {note.last_edited_by_name} {relativeTime(note.updated_at)}</>
+              )}
+            </span>
+          )}
 
           {/* Typing indicators */}
           {typingUsers.length > 0 && (
@@ -333,6 +464,21 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
                         Duplicate
                       </button>
                     )}
+                    {/* Pin / Unpin */}
+                    <button onClick={handleTogglePin}
+                      className="w-full text-left px-4 py-2 text-sm text-text-body hover:bg-bg-surface-hover">
+                      {isPinned ? 'Unpin note' : 'Pin note'}
+                    </button>
+                    {/* Lock / Unlock */}
+                    <button onClick={handleToggleLock}
+                      className="w-full text-left px-4 py-2 text-sm text-text-body hover:bg-bg-surface-hover">
+                      {isLocked ? 'Unlock note' : 'Lock note'}
+                    </button>
+                    {/* Hide */}
+                    <button onClick={handleHide}
+                      className="w-full text-left px-4 py-2 text-sm text-text-body hover:bg-bg-surface-hover">
+                      Hide note
+                    </button>
                     {onDelete && (
                       <>
                         <div className="my-1 border-t border-border-subtle" />
@@ -349,6 +495,22 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
           )}
         </div>
       </div>
+
+      {/* Lock banner */}
+      {isLocked && !overrideLock && (
+        <div className="bg-accent-muted border border-accent-line rounded-lg px-4 py-3 mx-6 mt-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-text-body">
+            <LockClosedIcon className="w-4 h-4 text-accent" />
+            <span>This note is locked to prevent accidental edits.</span>
+          </div>
+          <button
+            onClick={() => setOverrideLock(true)}
+            className="text-accent hover:text-accent-hover text-sm transition-colors"
+          >
+            Edit anyway
+          </button>
+        </div>
+      )}
 
       {/* Floating toolbar */}
       <FloatingToolbar
@@ -373,9 +535,24 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
             value={title}
             onChange={(e) => { setTitle(e.target.value); setSaveStatus('unsaved'); }}
             placeholder="Untitled"
-            className="w-full text-display-md bg-transparent border-none outline-none placeholder:text-text-tertiary mb-8"
-            readOnly={readOnly}
+            className="w-full text-display-md bg-transparent border-none outline-none placeholder:text-text-tertiary mb-4"
+            readOnly={effectiveReadOnly}
           />
+
+          {/* Category badges */}
+          <div className="flex flex-wrap items-center gap-2 mb-8">
+            {categories.map((cat) => (
+              <CategoryBadge key={cat.id} name={cat.name} color={cat.color} size="sm" />
+            ))}
+            {!effectiveReadOnly && (
+              <CategoryPicker
+                noteId={note?.id || ''}
+                currentCategories={categories}
+                allCategories={allCategories.map((c) => ({ id: c.id, name: c.name, color: c.color }))}
+                onToggle={handleCategoryToggle}
+              />
+            )}
+          </div>
 
           {/* Rich text editor */}
           <div className="prose-editorial">
@@ -385,7 +562,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               onChange={handleEditorChange}
               handleKeyCommand={handleKeyCommand}
               placeholder="Start writing..."
-              readOnly={readOnly}
+              readOnly={effectiveReadOnly}
               spellCheck={true}
             />
           </div>

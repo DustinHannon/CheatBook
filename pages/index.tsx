@@ -8,7 +8,7 @@ import RecentNotes from '../components/Dashboard/RecentNotes';
 import CategoryChips from '../components/Dashboard/CategoryChips';
 import ActivityFeed from '../components/Dashboard/ActivityFeed';
 import InputDialog from '../components/InputDialog';
-import CreateNoteDialog from '../components/CreateNoteDialog';
+import NotebookPickerDialog from '../components/NotebookPickerDialog';
 import { useAuth } from '../components/AuthContext';
 import { useTeam } from '../components/TeamContext';
 import { createClient } from '../lib/supabase/client';
@@ -18,10 +18,9 @@ import {
   getRecentTeamNotes,
   getCategories,
   getRecentActivity,
-  createNotebook as apiCreateNotebook,
-  createNote as apiCreateNote,
 } from '../lib/api';
 import type { Note, Category, ActivityLogEntry } from '../lib/api';
+import { FolderIcon, PlusIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 
 const supabase = createClient();
 
@@ -47,7 +46,9 @@ export default function Dashboard() {
 
   // Dialog states
   const [showCreateNotebook, setShowCreateNotebook] = useState(false);
-  const [showCreateNote, setShowCreateNote] = useState(false);
+  const [showNotebookPicker, setShowNotebookPicker] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isCreatingNote, setIsCreatingNote] = useState(false);
 
   // Redirect to team setup if needed
   useEffect(() => {
@@ -86,8 +87,7 @@ export default function Dashboard() {
     router.push(`/notes/${noteId}`);
   };
 
-  const [createError, setCreateError] = useState<string | null>(null);
-
+  // Create notebook via InputDialog
   const handleCreateNotebook = async (title: string) => {
     setCreateError(null);
     if (!user?.id || !team?.id) {
@@ -103,42 +103,39 @@ export default function Dashboard() {
       if (error) throw error;
       setNotebooks(prev => [{ ...nb, note_count: 0 }, ...prev]);
       setShowCreateNotebook(false);
-      // Auto-open create note dialog after creating first notebook
-      setTimeout(() => setShowCreateNote(true), 300);
     } catch (err: any) {
-      const msg = err?.message || 'Failed to create notebook';
-      console.error('Error creating notebook:', err);
-      setCreateError(msg);
+      setCreateError(err?.message || 'Failed to create notebook');
     }
   };
 
-  const handleCreateNote = async (notebookId: string, title: string) => {
-    setCreateError(null);
-    if (!user?.id) {
-      setCreateError('Not authenticated');
-      return;
-    }
+  // Quick-create a blank note in a notebook and navigate to editor
+  const quickCreateNote = async (notebookId: string) => {
+    if (!user?.id || isCreatingNote) return;
+    setIsCreatingNote(true);
     try {
       const { data: newNote, error } = await supabase
         .from('notes')
-        .insert({ title, notebook_id: notebookId, owner_id: user.id, last_edited_by: user.id })
+        .insert({ title: 'Untitled', notebook_id: notebookId, owner_id: user.id, last_edited_by: user.id })
         .select()
         .single();
       if (error) throw error;
-      setShowCreateNote(false);
+      setShowNotebookPicker(false);
       router.push(`/notes/${newNote.id}`);
-    } catch (err: any) {
-      const msg = err?.message || 'Failed to create note';
+    } catch (err) {
       console.error('Error creating note:', err);
-      setCreateError(msg);
+    } finally {
+      setIsCreatingNote(false);
     }
   };
 
+  // "New Note" button handler
   const handleNewNoteClick = () => {
     if (notebooks.length === 0) {
       setShowCreateNotebook(true);
+    } else if (notebooks.length === 1) {
+      quickCreateNote(notebooks[0].id);
     } else {
-      setShowCreateNote(true);
+      setShowNotebookPicker(true);
     }
   };
 
@@ -178,15 +175,23 @@ export default function Dashboard() {
                   </p>
                 )}
               </div>
-              <button
-                onClick={handleNewNoteClick}
-                className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-5 py-2.5 text-sm transition flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                New Note
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowCreateNotebook(true)}
+                  className="bg-bg-surface hover:bg-bg-surface-hover text-text-secondary border border-border-default rounded-lg px-4 py-2.5 text-sm transition flex items-center gap-2"
+                >
+                  <FolderIcon className="w-4 h-4" />
+                  New Notebook
+                </button>
+                <button
+                  onClick={handleNewNoteClick}
+                  disabled={isCreatingNote}
+                  className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-5 py-2.5 text-sm transition flex items-center gap-2 disabled:opacity-50"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  {isCreatingNote ? 'Creating...' : 'New Note'}
+                </button>
+              </div>
             </div>
 
             <div className="flex gap-8">
@@ -200,7 +205,7 @@ export default function Dashboard() {
                 )}
 
                 {/* Category filter */}
-                {categories.length > 0 && (
+                {categories.length > 0 && recentNotes.length > 0 && (
                   <div className="mb-6 animate-slide-up stagger-2">
                     <CategoryChips
                       categories={categories}
@@ -211,48 +216,86 @@ export default function Dashboard() {
                 )}
 
                 {/* Recent Notes */}
-                <div className="animate-slide-up stagger-3">
-                  <RecentNotes
-                    notes={filteredNotes}
-                    onNoteClick={handleNoteClick}
-                    isLoading={isLoading}
-                  />
-                </div>
+                {(filteredNotes.length > 0 || isLoading) && (
+                  <div className="animate-slide-up stagger-3">
+                    <RecentNotes
+                      notes={filteredNotes}
+                      onNoteClick={handleNoteClick}
+                      isLoading={isLoading}
+                    />
+                  </div>
+                )}
 
-                {/* Empty state */}
-                {!isLoading && recentNotes.length === 0 && (
+                {/* Notebooks grid — show when notebooks exist but no notes */}
+                {!isLoading && recentNotes.length === 0 && notebooks.length > 0 && (
+                  <div className="animate-slide-up">
+                    <h3 className="section-label mb-4">Your Notebooks</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {notebooks.map(nb => (
+                        <div
+                          key={nb.id}
+                          className="bg-bg-raised border border-border-subtle rounded-lg p-5 hover:bg-bg-surface-hover hover:-translate-y-0.5 transition-all group"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div
+                              className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
+                              onClick={() => router.push(`/notebooks/${nb.id}`)}
+                            >
+                              <div className="w-10 h-10 rounded-lg bg-accent-muted flex items-center justify-center flex-shrink-0">
+                                <FolderIcon className="w-5 h-5 text-accent" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-medium text-text-primary truncate">{nb.title}</h4>
+                                <p className="text-xs text-text-tertiary mt-0.5">
+                                  {nb.note_count || 0} {(nb.note_count || 0) === 1 ? 'note' : 'notes'}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => quickCreateNote(nb.id)}
+                              disabled={isCreatingNote}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity bg-accent hover:bg-accent-hover text-bg-base rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1 flex-shrink-0 disabled:opacity-50"
+                            >
+                              <PlusIcon className="w-3 h-3" />
+                              Note
+                            </button>
+                          </div>
+                          {nb.description && (
+                            <p className="text-sm text-text-secondary mt-3 line-clamp-2">{nb.description}</p>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Add notebook card */}
+                      <button
+                        onClick={() => setShowCreateNotebook(true)}
+                        className="border border-dashed border-border-default rounded-lg p-5 flex items-center justify-center gap-2 text-text-tertiary hover:text-text-secondary hover:border-border-emphasis transition-colors min-h-[88px]"
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                        <span className="text-sm">Add Notebook</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state — no notebooks at all */}
+                {!isLoading && notebooks.length === 0 && recentNotes.length === 0 && (
                   <div className="text-center py-20 animate-fade-in">
-                    {notebooks.length === 0 ? (
-                      <>
-                        <h2 className="text-display-sm font-display text-text-primary mb-3">
-                          Welcome to CheatBook
-                        </h2>
-                        <p className="text-text-secondary mb-8 max-w-md mx-auto">
-                          Create your first notebook to start saving notes, scripts, IPs, and anything your IT team needs to remember.
-                        </p>
-                        <button
-                          onClick={() => setShowCreateNotebook(true)}
-                          className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-6 py-3 text-sm transition"
-                        >
-                          Create First Notebook
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <h2 className="text-display-sm font-display text-text-primary mb-3">
-                          No notes yet
-                        </h2>
-                        <p className="text-text-secondary mb-8 max-w-md mx-auto">
-                          You have {notebooks.length} notebook{notebooks.length > 1 ? 's' : ''}. Create your first note to get started.
-                        </p>
-                        <button
-                          onClick={() => setShowCreateNote(true)}
-                          className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-6 py-3 text-sm transition"
-                        >
-                          Create First Note
-                        </button>
-                      </>
-                    )}
+                    <div className="w-16 h-16 rounded-2xl bg-accent-muted flex items-center justify-center mx-auto mb-6">
+                      <DocumentTextIcon className="w-8 h-8 text-accent" />
+                    </div>
+                    <h2 className="text-display-sm font-display text-text-primary mb-3">
+                      Welcome to CheatBook
+                    </h2>
+                    <p className="text-text-secondary mb-8 max-w-md mx-auto">
+                      Create your first notebook to start saving notes, scripts, IPs, and anything your IT team needs to remember.
+                    </p>
+                    <button
+                      onClick={() => setShowCreateNotebook(true)}
+                      className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-6 py-3 text-sm transition"
+                    >
+                      Create First Notebook
+                    </button>
                   </div>
                 )}
               </div>
@@ -276,11 +319,11 @@ export default function Dashboard() {
           error={createError}
         />
 
-        {/* Create Note Dialog */}
-        <CreateNoteDialog
-          isOpen={showCreateNote}
-          onClose={() => setShowCreateNote(false)}
-          onCreate={handleCreateNote}
+        {/* Notebook Picker for new note */}
+        <NotebookPickerDialog
+          isOpen={showNotebookPicker}
+          onClose={() => setShowNotebookPicker(false)}
+          onSelect={quickCreateNote}
           notebooks={notebooks}
         />
       </Layout>

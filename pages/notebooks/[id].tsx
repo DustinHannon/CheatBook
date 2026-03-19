@@ -10,7 +10,6 @@ import { createClient } from '../../lib/supabase/client';
 import {
   getNotebooks,
   getNotesForNotebook,
-  createNote as apiCreateNote,
 } from '../../lib/api';
 
 const supabase = createClient();
@@ -58,9 +57,14 @@ export default function NotebookPage() {
   }, [id]);
 
   const handleCreateNote = async () => {
-    if (!id || typeof id !== 'string') return;
+    if (!id || typeof id !== 'string' || !user?.id) return;
     try {
-      const newNote = await apiCreateNote(supabase, id, 'Untitled');
+      const { data: newNote, error } = await supabase
+        .from('notes')
+        .insert({ title: 'Untitled', notebook_id: id, owner_id: user.id, last_edited_by: user.id })
+        .select()
+        .single();
+      if (error) throw error;
       router.push(`/notes/${newNote.id}`);
     } catch (err) {
       console.error('Error creating note:', err);

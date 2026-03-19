@@ -11,37 +11,45 @@ import {
   getNotebooks,
   getNotesForNotebook,
   getNote,
-  createNote as apiCreateNote,
   deleteNote as apiDeleteNote,
   uploadNoteImage,
+  getCategories,
 } from '../../lib/api';
+import { useTeam } from '../../components/TeamContext';
+import type { Category } from '../../lib/api';
 
 const supabase = createClient();
 
 export default function NotePage() {
   const { user } = useAuth();
+  const { team } = useTeam();
   const router = useRouter();
   const { id } = router.query;
 
   const [note, setNote] = useState<any>(null);
   const [notebooks, setNotebooks] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [selectedNotebookId, setSelectedNotebookId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch notebooks
+  // Fetch notebooks and categories
   useEffect(() => {
     if (!user) return;
-    const fetch = async () => {
+    const fetchData = async () => {
       try {
         const nbs = await getNotebooks(supabase);
         setNotebooks(nbs);
+        if (team?.id) {
+          const cats = await getCategories(supabase, team.id);
+          setAllCategories(cats);
+        }
       } catch (err) {
-        console.error('Error fetching notebooks:', err);
+        console.error('Error fetching data:', err);
       }
     };
-    fetch();
-  }, [user]);
+    fetchData();
+  }, [user, team?.id]);
 
   // Fetch note by ID
   useEffect(() => {
@@ -94,9 +102,14 @@ export default function NotePage() {
   };
 
   const handleCreateNote = async () => {
-    if (!selectedNotebookId) return;
+    if (!selectedNotebookId || !user?.id) return;
     try {
-      const newNote = await apiCreateNote(supabase, selectedNotebookId, 'Untitled');
+      const { data: newNote, error } = await supabase
+        .from('notes')
+        .insert({ title: 'Untitled', notebook_id: selectedNotebookId, owner_id: user.id, last_edited_by: user.id })
+        .select()
+        .single();
+      if (error) throw error;
       router.push(`/notes/${newNote.id}`);
     } catch (err) {
       console.error('Error creating note:', err);
@@ -112,10 +125,15 @@ export default function NotePage() {
     }
   };
 
-  const handleDuplicateNote = async (noteId: string) => {
-    if (!note || !selectedNotebookId) return;
+  const handleDuplicateNote = async () => {
+    if (!note || !selectedNotebookId || !user?.id) return;
     try {
-      const newNote = await apiCreateNote(supabase, selectedNotebookId, `${note.title} (Copy)`, note.content);
+      const { data: newNote, error } = await supabase
+        .from('notes')
+        .insert({ title: `${note.title} (Copy)`, content: note.content, notebook_id: selectedNotebookId, owner_id: user.id, last_edited_by: user.id })
+        .select()
+        .single();
+      if (error) throw error;
       router.push(`/notes/${newNote.id}`);
     } catch (err) {
       console.error('Error duplicating note:', err);
@@ -148,6 +166,7 @@ export default function NotePage() {
               onSave={handleSaveNote}
               onDelete={handleDeleteNote}
               onDuplicate={handleDuplicateNote}
+              allCategories={allCategories}
             />
           </ImagePaste>
         ) : (
