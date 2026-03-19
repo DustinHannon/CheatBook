@@ -7,6 +7,8 @@ import PinnedNotes from '../components/Dashboard/PinnedNotes';
 import RecentNotes from '../components/Dashboard/RecentNotes';
 import CategoryChips from '../components/Dashboard/CategoryChips';
 import ActivityFeed from '../components/Dashboard/ActivityFeed';
+import InputDialog from '../components/InputDialog';
+import CreateNoteDialog from '../components/CreateNoteDialog';
 import { useAuth } from '../components/AuthContext';
 import { useTeam } from '../components/TeamContext';
 import { createClient } from '../lib/supabase/client';
@@ -43,7 +45,11 @@ export default function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Redirect to team setup if needed (only after team loading completes)
+  // Dialog states
+  const [showCreateNotebook, setShowCreateNotebook] = useState(false);
+  const [showCreateNote, setShowCreateNote] = useState(false);
+
+  // Redirect to team setup if needed
   useEffect(() => {
     if (!isTeamLoading && needsTeamSetup && user) {
       router.push('/team-setup');
@@ -80,28 +86,31 @@ export default function Dashboard() {
     router.push(`/notes/${noteId}`);
   };
 
-  const handleCreateNotebook = async () => {
-    const title = prompt('Notebook name:');
-    if (!title) return;
+  const handleCreateNotebook = async (title: string) => {
     try {
       const nb = await apiCreateNotebook(supabase, title);
       setNotebooks(prev => [{ ...nb, note_count: 0 }, ...prev]);
+      setShowCreateNotebook(false);
     } catch (err) {
       console.error('Error creating notebook:', err);
     }
   };
 
-  const handleQuickCreate = async () => {
-    if (notebooks.length === 0) {
-      handleCreateNotebook();
-      return;
-    }
-    // Create in the first notebook
+  const handleCreateNote = async (notebookId: string, title: string) => {
     try {
-      const newNote = await apiCreateNote(supabase, notebooks[0].id, 'Untitled');
+      const newNote = await apiCreateNote(supabase, notebookId, title);
+      setShowCreateNote(false);
       router.push(`/notes/${newNote.id}`);
     } catch (err) {
       console.error('Error creating note:', err);
+    }
+  };
+
+  const handleNewNoteClick = () => {
+    if (notebooks.length === 0) {
+      setShowCreateNotebook(true);
+    } else {
+      setShowCreateNote(true);
     }
   };
 
@@ -118,8 +127,8 @@ export default function Dashboard() {
         notebooks={notebooks}
         onSelectNotebook={(id) => router.push(`/notebooks/${id}`)}
         onSelectNote={(id) => router.push(`/notes/${id}`)}
-        onCreateNotebook={handleCreateNotebook}
-        onCreateNote={handleQuickCreate}
+        onCreateNotebook={() => setShowCreateNotebook(true)}
+        onCreateNote={handleNewNoteClick}
         showSidebar={false}
       >
         <Head>
@@ -142,7 +151,7 @@ export default function Dashboard() {
                 )}
               </div>
               <button
-                onClick={handleQuickCreate}
+                onClick={handleNewNoteClick}
                 className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-5 py-2.5 text-sm transition flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -192,7 +201,7 @@ export default function Dashboard() {
                       Create your first notebook to start saving notes, scripts, IPs, and anything your IT team needs to remember.
                     </p>
                     <button
-                      onClick={handleCreateNotebook}
+                      onClick={() => setShowCreateNotebook(true)}
                       className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-6 py-3 text-sm transition"
                     >
                       Create First Notebook
@@ -208,6 +217,24 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Create Notebook Dialog */}
+        <InputDialog
+          isOpen={showCreateNotebook}
+          onClose={() => setShowCreateNotebook(false)}
+          onSubmit={handleCreateNotebook}
+          title="Create a Notebook"
+          placeholder="e.g. Network, Servers, Scripts..."
+          submitLabel="Create Notebook"
+        />
+
+        {/* Create Note Dialog */}
+        <CreateNoteDialog
+          isOpen={showCreateNote}
+          onClose={() => setShowCreateNote(false)}
+          onCreate={handleCreateNote}
+          notebooks={notebooks}
+        />
       </Layout>
     </ProtectedRoute>
   );
