@@ -42,12 +42,12 @@ const ProfilePage: NextPage = () => {
         setName(profileData.name || '');
         setStats(statsData);
         setNotebooks(notebooksData);
-      } catch {
-        // Fail silently on initial load
+      } catch (err) {
+        console.error('Profile load error:', err);
       }
     };
-    loadData();
-  }, []);
+    if (user) loadData();
+  }, [user]);
 
   const handleSave = async () => {
     setIsSaving(true);
