@@ -1,15 +1,6 @@
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode } from 'react';
 import { createClient } from '../lib/supabase/client';
 import { useAuth } from './AuthContext';
-import {
-  getTeam,
-  getTeamMembers,
-  createTeam as apiCreateTeam,
-  joinTeam as apiJoinTeam,
-  inviteTeamMember,
-  removeTeamMember,
-  updateMemberRole,
-} from '../lib/api';
 import type { Team, TeamMember } from '../lib/api';
 
 interface TeamContextType {
@@ -43,7 +34,7 @@ const TeamContext = createContext<TeamContextType>({
 const supabase = createClient();
 
 export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [team, setTeam] = useState<Team | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -51,7 +42,7 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchTeamData = useCallback(async () => {
-    if (!user?.id) {
+    if (!user?.id || !isAuthenticated) {
       setTeam(null);
       setTeamMembers([]);
       setIsAdmin(false);
@@ -62,9 +53,21 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     setIsLoading(true);
     try {
-      const teamData = await getTeam(supabase);
+      // Step 1: Get team_id from profile (simple, no RLS issues)
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('team_id')
+        .eq('id', user.id)
+        .single();
 
-      if (!teamData) {
+      if (profileError) {
+        console.error('TeamContext: profile fetch error', profileError);
+        setNeedsTeamSetup(true);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!profile?.team_id) {
         setTeam(null);
         setTeamMembers([]);
         setIsAdmin(false);
@@ -73,59 +76,83 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
 
+      // Step 2: Get team details
+      const { data: teamData, error: teamError } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('id', profile.team_id)
+        .single();
+
+      if (teamError || !teamData) {
+        console.error('TeamContext: team fetch error', teamError);
+        // Team exists in profile but can't read it — might be RLS issue
+        // Still set the team as a minimal object so we don't loop
+        setTeam({ id: profile.team_id, name: 'My Team', invite_code: '', created_at: '' });
+        setNeedsTeamSetup(false);
+        setIsLoading(false);
+        return;
+      }
+
       setTeam(teamData);
       setNeedsTeamSetup(false);
 
-      const members = await getTeamMembers(supabase, teamData.id);
-      setTeamMembers(members);
+      // Step 3: Get team members
+      const { data: members } = await supabase
+        .from('team_members')
+        .select('*, profiles:user_id(*)')
+        .eq('team_id', teamData.id)
+        .order('created_at', { ascending: true });
 
-      const currentMember = members.find(m => m.user_id === user.id);
-      setIsAdmin(currentMember?.role === 'owner' || currentMember?.role === 'admin');
+      setTeamMembers((members || []).map((m: any) => ({ ...m, profiles: m.profiles ?? undefined })));
+
+      const currentMember = (members || []).find((m: any) => m.user_id === user.id);
+      setIsAdmin(currentMember?.role === 'admin');
     } catch (err) {
-      console.error('Failed to fetch team data:', err);
-      setTeam(null);
-      setTeamMembers([]);
-      setIsAdmin(false);
-      setNeedsTeamSetup(true);
+      console.error('TeamContext: unexpected error', err);
+      // Don't set needsTeamSetup on unexpected errors — prevent redirect loop
+      setNeedsTeamSetup(false);
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, isAuthenticated]);
 
   useEffect(() => {
     fetchTeamData();
   }, [fetchTeamData]);
 
   const handleCreateTeam = useCallback(async (name: string) => {
-    await apiCreateTeam(supabase, name);
+    const { error } = await supabase.rpc('create_team_with_owner', { team_name: name });
+    if (error) throw error;
     await fetchTeamData();
   }, [fetchTeamData]);
 
   const handleJoinTeam = useCallback(async (inviteCode: string) => {
-    await apiJoinTeam(supabase, inviteCode);
+    const { error } = await supabase.rpc('join_team_by_code', { code: inviteCode });
+    if (error) throw error;
     await fetchTeamData();
   }, [fetchTeamData]);
 
   const handleInviteMember = useCallback(async (email: string) => {
     if (!team) throw new Error('No team');
-    await inviteTeamMember(supabase, team.id, email);
-    const members = await getTeamMembers(supabase, team.id);
-    setTeamMembers(members);
-  }, [team]);
+    const { data: profile } = await supabase.from('profiles').select('id').eq('email', email).single();
+    if (!profile) throw new Error('User not found');
+    await supabase.from('team_members').insert({ team_id: team.id, user_id: profile.id, role: 'member' });
+    await supabase.from('profiles').update({ team_id: team.id }).eq('id', profile.id);
+    await fetchTeamData();
+  }, [team, fetchTeamData]);
 
   const handleRemoveMember = useCallback(async (userId: string) => {
     if (!team) throw new Error('No team');
-    await removeTeamMember(supabase, team.id, userId);
-    const members = await getTeamMembers(supabase, team.id);
-    setTeamMembers(members);
-  }, [team]);
+    await supabase.from('team_members').delete().eq('team_id', team.id).eq('user_id', userId);
+    await supabase.from('profiles').update({ team_id: null }).eq('id', userId);
+    await fetchTeamData();
+  }, [team, fetchTeamData]);
 
   const handleUpdateRole = useCallback(async (userId: string, role: string) => {
     if (!team) throw new Error('No team');
-    await updateMemberRole(supabase, team.id, userId, role);
-    const members = await getTeamMembers(supabase, team.id);
-    setTeamMembers(members);
-  }, [team]);
+    await supabase.from('team_members').update({ role }).eq('team_id', team.id).eq('user_id', userId);
+    await fetchTeamData();
+  }, [team, fetchTeamData]);
 
   return (
     <TeamContext.Provider

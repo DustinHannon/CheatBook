@@ -46,20 +46,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Check if user needs team setup (skip if already on team-setup page)
-  if (user && !isPublic && !pathname.startsWith('/team-setup')) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('team_id')
-      .eq('id', user.id)
-      .single();
-
-    if (profile && !profile.team_id) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/team-setup';
-      return NextResponse.redirect(url);
-    }
-  }
+  // Team setup redirect is handled client-side by TeamContext + dashboard useEffect
+  // to avoid race conditions with server-side middleware
 
   return supabaseResponse;
 }
