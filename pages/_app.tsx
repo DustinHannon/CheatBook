@@ -6,7 +6,6 @@ import { RealtimeProvider } from '../components/RealtimeContext';
 import { TeamProvider } from '../components/TeamContext';
 import { ToastProvider } from '../components/Toast';
 import '../styles/theme.css';
-import '../styles/editor.css';
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (
