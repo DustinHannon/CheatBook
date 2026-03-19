@@ -13,13 +13,13 @@ import {
   Profile,
 } from '../lib/api';
 import { useTeam } from '../components/TeamContext';
-import { ClipboardDocumentIcon, UserMinusIcon } from '@heroicons/react/24/outline';
+import { ClipboardDocumentIcon, UserMinusIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 
 const supabase = createClient();
 
 const ProfilePage: NextPage = () => {
   const { user, logout } = useAuth();
-  const { team, teamMembers, isAdmin, inviteMember, removeMember } = useTeam();
+  const { team, teamMembers, isAdmin, inviteMember, removeMember, updateRole } = useTeam();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -273,13 +273,36 @@ const ProfilePage: NextPage = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            member.role === 'admin'
-                              ? 'bg-accent-muted text-accent'
-                              : 'bg-bg-surface text-text-tertiary'
-                          }`}>
-                            {member.role}
-                          </span>
+                          {isAdmin && member.user_id !== user?.id ? (
+                            <button
+                              onClick={async () => {
+                                const newRole = member.role === 'admin' ? 'member' : 'admin';
+                                try {
+                                  await updateRole(member.user_id, newRole);
+                                } catch (err) {
+                                  console.error('Failed to update role:', err);
+                                }
+                              }}
+                              className={`text-xs px-2 py-0.5 rounded-full cursor-pointer transition-colors ${
+                                member.role === 'admin'
+                                  ? 'bg-accent-muted text-accent hover:bg-accent/20'
+                                  : 'bg-bg-surface text-text-tertiary hover:bg-bg-surface-hover hover:text-text-secondary'
+                              }`}
+                              title={member.role === 'admin' ? 'Click to demote to member' : 'Click to promote to admin'}
+                            >
+                              {member.role === 'admin' && <ShieldCheckIcon className="w-3 h-3 inline mr-0.5 -mt-0.5" />}
+                              {member.role}
+                            </button>
+                          ) : (
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              member.role === 'admin'
+                                ? 'bg-accent-muted text-accent'
+                                : 'bg-bg-surface text-text-tertiary'
+                            }`}>
+                              {member.role === 'admin' && <ShieldCheckIcon className="w-3 h-3 inline mr-0.5 -mt-0.5" />}
+                              {member.role}
+                            </span>
+                          )}
                           {isAdmin && member.user_id !== user?.id && (
                             <button
                               onClick={async () => {
