@@ -32,7 +32,7 @@ function getGreeting(): string {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { team, needsTeamSetup } = useTeam();
+  const { team, needsTeamSetup, isLoading: isTeamLoading } = useTeam();
   const router = useRouter();
 
   const [notebooks, setNotebooks] = useState<any[]>([]);
@@ -43,12 +43,12 @@ export default function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Redirect to team setup if needed
+  // Redirect to team setup if needed (only after team loading completes)
   useEffect(() => {
-    if (needsTeamSetup && user) {
+    if (!isTeamLoading && needsTeamSetup && user) {
       router.push('/team-setup');
     }
-  }, [needsTeamSetup, user, router]);
+  }, [isTeamLoading, needsTeamSetup, user, router]);
 
   // Fetch all dashboard data
   useEffect(() => {

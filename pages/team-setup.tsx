@@ -2,12 +2,11 @@ import React, { useState, FormEvent } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthContext';
-import { createClient } from '../lib/supabase/client';
-
-const supabase = createClient();
+import { useTeam } from '../components/TeamContext';
 
 export default function TeamSetup() {
   const { user } = useAuth();
+  const { createTeam, joinTeam } = useTeam();
   const router = useRouter();
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
   const [teamName, setTeamName] = useState('');
@@ -21,8 +20,7 @@ export default function TeamSetup() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const { error: rpcError } = await supabase.rpc('create_team_with_owner', { team_name: teamName.trim() });
-      if (rpcError) throw new Error(rpcError.message);
+      await createTeam(teamName.trim());
       router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create team');
@@ -37,8 +35,7 @@ export default function TeamSetup() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const { error: rpcError } = await supabase.rpc('join_team_by_code', { code: inviteCode.trim() });
-      if (rpcError) throw new Error(rpcError.message);
+      await joinTeam(inviteCode.trim());
       router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join team');
