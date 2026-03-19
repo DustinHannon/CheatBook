@@ -8,6 +8,7 @@ interface InputDialogProps {
   placeholder?: string;
   submitLabel?: string;
   defaultValue?: string;
+  error?: string | null;
 }
 
 const InputDialog: React.FC<InputDialogProps> = ({
@@ -18,6 +19,7 @@ const InputDialog: React.FC<InputDialogProps> = ({
   placeholder = '',
   submitLabel = 'Create',
   defaultValue = '',
+  error,
 }) => {
   const [value, setValue] = useState(defaultValue);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +59,12 @@ const InputDialog: React.FC<InputDialogProps> = ({
       <div className="absolute inset-0 bg-bg-overlay backdrop-blur-sm animate-dialog-fade-in" onClick={onClose} />
       <div className="relative bg-bg-surface border border-border-default rounded-xl shadow-lg max-w-md w-full mx-4 p-6 animate-dialog-scale-in">
         <h3 className="text-display-sm font-display text-text-primary">{title}</h3>
+
+        {error && (
+          <div className="mt-4 bg-status-error/10 border border-status-error/20 text-status-error rounded-lg px-4 py-3 text-sm">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-6">
           <input

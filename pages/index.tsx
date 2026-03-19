@@ -86,23 +86,31 @@ export default function Dashboard() {
     router.push(`/notes/${noteId}`);
   };
 
+  const [createError, setCreateError] = useState<string | null>(null);
+
   const handleCreateNotebook = async (title: string) => {
+    setCreateError(null);
     try {
       const nb = await apiCreateNotebook(supabase, title);
       setNotebooks(prev => [{ ...nb, note_count: 0 }, ...prev]);
       setShowCreateNotebook(false);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create notebook';
       console.error('Error creating notebook:', err);
+      setCreateError(msg);
     }
   };
 
   const handleCreateNote = async (notebookId: string, title: string) => {
+    setCreateError(null);
     try {
       const newNote = await apiCreateNote(supabase, notebookId, title);
       setShowCreateNote(false);
       router.push(`/notes/${newNote.id}`);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create note';
       console.error('Error creating note:', err);
+      setCreateError(msg);
     }
   };
 
@@ -221,11 +229,12 @@ export default function Dashboard() {
         {/* Create Notebook Dialog */}
         <InputDialog
           isOpen={showCreateNotebook}
-          onClose={() => setShowCreateNotebook(false)}
+          onClose={() => { setShowCreateNotebook(false); setCreateError(null); }}
           onSubmit={handleCreateNotebook}
           title="Create a Notebook"
           placeholder="e.g. Network, Servers, Scripts..."
           submitLabel="Create Notebook"
+          error={createError}
         />
 
         {/* Create Note Dialog */}

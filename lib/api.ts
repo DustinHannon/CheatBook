@@ -97,6 +97,10 @@ export type ActivityLogEntry = {
 
 // ─── Helper ──────────────────────────────────────────────────────────
 async function getCurrentUser(supabase: SupabaseClient) {
+  // Use getSession() for client-side (reads local cache, faster and more reliable)
+  // Falls back to getUser() if session is not available
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) return session.user;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
   return user;
