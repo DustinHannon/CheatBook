@@ -90,12 +90,21 @@ export default function Dashboard() {
 
   const handleCreateNotebook = async (title: string) => {
     setCreateError(null);
+    if (!user?.id || !team?.id) {
+      setCreateError('Not authenticated or no team');
+      return;
+    }
     try {
-      const nb = await apiCreateNotebook(supabase, title);
+      const { data: nb, error } = await supabase
+        .from('notebooks')
+        .insert({ title, owner_id: user.id, team_id: team.id })
+        .select()
+        .single();
+      if (error) throw error;
       setNotebooks(prev => [{ ...nb, note_count: 0 }, ...prev]);
       setShowCreateNotebook(false);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to create notebook';
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to create notebook';
       console.error('Error creating notebook:', err);
       setCreateError(msg);
     }
@@ -103,12 +112,21 @@ export default function Dashboard() {
 
   const handleCreateNote = async (notebookId: string, title: string) => {
     setCreateError(null);
+    if (!user?.id) {
+      setCreateError('Not authenticated');
+      return;
+    }
     try {
-      const newNote = await apiCreateNote(supabase, notebookId, title);
+      const { data: newNote, error } = await supabase
+        .from('notes')
+        .insert({ title, notebook_id: notebookId, owner_id: user.id, last_edited_by: user.id })
+        .select()
+        .single();
+      if (error) throw error;
       setShowCreateNote(false);
       router.push(`/notes/${newNote.id}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to create note';
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to create note';
       console.error('Error creating note:', err);
       setCreateError(msg);
     }
