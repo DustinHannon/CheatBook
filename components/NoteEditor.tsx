@@ -390,6 +390,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
             readOnly={effectiveReadOnly}
           />
           <Editor
+            licenseKey="gpl"
             tinymceScriptSrc="/tinymce/tinymce.min.js"
             onInit={(_evt, editor) => { editorRef.current = editor; }}
             initialValue={content}
