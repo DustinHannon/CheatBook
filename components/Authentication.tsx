@@ -1,4 +1,5 @@
-import React, { useState, FormEvent } from 'react';
+import React, { useState, useEffect, FormEvent } from 'react';
+import { useRouter } from 'next/router';
 import { useAuth } from './AuthContext';
 
 const Authentication: React.FC = () => {
@@ -9,16 +10,18 @@ const Authentication: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [signUpSuccess, setSignUpSuccess] = useState(false);
   const { isAuthenticated, user, signIn, signUp, error, setError } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      router.push('/');
+    }
+  }, [isAuthenticated, user, router]);
 
   if (isAuthenticated && user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-bg-base">
-        <div className="text-center">
-          <h2 className="text-display-sm font-display text-text-primary">Welcome back</h2>
-          <p className="mt-2 text-text-secondary font-body">
-            Signed in as <span className="text-text-primary">{user.email}</span>
-          </p>
-        </div>
+        <span className="text-text-tertiary font-display text-xl animate-pulse-gold">Redirecting...</span>
       </div>
     );
   }
