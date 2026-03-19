@@ -11,9 +11,9 @@ An IT team notes app for quickly saving and sharing the things you need to remem
 - **Auth**: Supabase Auth (email + password with email confirmation)
 - **Real-time**: Supabase Realtime (Presence + Broadcast)
 - **Storage**: Supabase Storage (images, avatars)
+- **Editor**: TinyMCE 7 (self-hosted, GPL) with dark oxide skin
 - **Styling**: Tailwind CSS 3 with dark editorial design system
 - **Typography**: Cormorant Garamond (display), DM Sans (body), JetBrains Mono (code)
-- **Editor**: Draft.js with floating selection toolbar
 - **Hosting**: Vercel
 
 ## Features
@@ -21,39 +21,36 @@ An IT team notes app for quickly saving and sharing the things you need to remem
 ### Team Collaboration
 - **Team system** — Create a team or join one with an invite code
 - **Team-scoped data** — All notebooks and notes shared across the team
-- **Admin controls** — Invite/remove members, manage roles (admin/member)
+- **Admin controls** — Invite/remove members, toggle admin/member roles
+- **Invite code** — Copy and share, visible on settings page
 - **Real-time editing** — Multiple people can edit the same note simultaneously
 - **Presence indicators** — See who's online and editing
 - **Typing indicators** — See when teammates are typing
-- **Activity feed** — Dashboard shows recent team activity (who edited what)
 
-### Notes & Organization
-- **Rich text editor** — Bold, italic, underline, headings, lists with floating toolbar
-- **Categories** — Tag notes with colored categories (Network, Servers, Scripts, Credentials, How-To, General)
-- **Note locking** — Lock important notes to prevent accidental edits (confirmation required to edit)
-- **Note pinning** — Pin important notes to the top of the dashboard
-- **Note hiding** — Hide notes per-user without deleting them for the team
+### Notes & Editor
+- **TinyMCE rich text editor** — Bold, italic, underline, strikethrough, headings, lists, blockquote, links, images, tables, horizontal rules
+- **Code blocks** — Insert code samples with language selection (codesample plugin)
+- **Note locking** — Lock important notes to prevent accidental edits (confirmation to override)
+- **Note pinning** — Pin important notes to dashboard
+- **Note hiding** — Hide notes per-user without deleting for the team
 - **Note metadata** — See who created a note and who last edited it
 - **Auto-save** — Changes save automatically every 2 seconds
-- **Image support** — Paste or upload images directly into notes
+- **Ctrl+S** — Manual save keyboard shortcut
+- **Backward compatible** — Old Draft.js JSON content auto-converts to HTML
+
+### Dashboard & Navigation
+- **Sidebar** — Always visible, shows notebooks and notes for quick navigation
+- **Dashboard** — Greeting, recent notes grid, activity feed
 - **Command palette** — Cmd+K / Ctrl+K for quick note search
+- **Quick-create** — One click to create a note (picks notebook automatically or shows picker)
+- **Notebook cards** — Visible on dashboard when no notes exist yet
 
-### Dashboard
-- **Greeting** with team name badge
-- **Pinned notes** section — horizontal scroll of important notes
-- **Recent notes** grid — latest edited notes across all notebooks
-- **Category filter chips** — filter notes by category
-- **Activity feed** — team actions in real-time
-- **Quick-create** button for new notes
-
-### UI & Design
-- Dark editorial aesthetic with warm gold (#d4a574) accents
-- Cormorant Garamond serif headings, DM Sans body text
-- CSS noise grain texture overlay
-- Toast notifications for all actions
-- Styled confirmation dialogs (no browser alerts)
-- Loading skeleton animations
-- Responsive design (mobile sidebar collapses)
+### Settings & Admin
+- **Profile** — Name, avatar upload, email (read-only)
+- **Team management** — View team name, invite code (copy button), member list with roles
+- **Role management** — Admins can click role badges to toggle admin/member
+- **Invite by email** — Add team members directly (they must have an account)
+- **Remove members** — Admin can remove any non-self member
 
 ## Pages
 
@@ -61,18 +58,18 @@ An IT team notes app for quickly saving and sharing the things you need to remem
 |-------|-------------|
 | `/login` | Cinematic split-screen sign in / sign up |
 | `/team-setup` | Create or join a team (post-signup) |
-| `/` | Dashboard — pinned notes, recent notes, activity feed |
-| `/notes/[id]` | Note editor with real-time collaboration |
+| `/` | Dashboard — recent notes, activity feed, sidebar navigation |
+| `/notes/[id]` | Note editor with TinyMCE, real-time collaboration |
 | `/notebooks/[id]` | Notebook listing with note cards |
-| `/search` | Full-page note search with category filtering |
-| `/profile` | User settings, team management, avatar |
+| `/search` | Full-page note search |
+| `/profile` | User settings, team management |
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 22+
-- A Supabase project with the schema applied (see database migrations)
+- A Supabase project with the schema applied
 
 ### Setup
 
@@ -89,48 +86,16 @@ An IT team notes app for quickly saving and sharing the things you need to remem
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
    ```
 
-3. Run:
+3. Copy TinyMCE assets (if not already present):
+   ```bash
+   cp -r node_modules/tinymce/skins node_modules/tinymce/themes node_modules/tinymce/icons node_modules/tinymce/models node_modules/tinymce/plugins public/tinymce/
+   cp node_modules/tinymce/tinymce.min.js public/tinymce/
+   ```
+
+4. Run:
    ```bash
    npm run dev
    ```
-
-4. Open [http://localhost:3000](http://localhost:3000)
-
-## Project Structure
-
-```
-├── components/
-│   ├── AuthContext.tsx         # Supabase Auth provider
-│   ├── TeamContext.tsx         # Team state management
-│   ├── RealtimeContext.tsx     # Supabase Realtime channels
-│   ├── Authentication.tsx     # Split-screen login/signup
-│   ├── CommandPalette.tsx     # Cmd+K search overlay
-│   ├── NoteEditor.tsx         # Draft.js editor with collaboration
-│   ├── FloatingToolbar.tsx    # Selection-triggered formatting
-│   ├── NoteCard.tsx           # Reusable note preview card
-│   ├── CategoryBadge.tsx      # Colored category pill
-│   ├── CategoryPicker.tsx     # Category assignment popover
-│   ├── Toast.tsx              # Toast notification system
-│   ├── ConfirmDialog.tsx      # Styled confirmation modal
-│   ├── Skeleton.tsx           # Loading skeleton components
-│   ├── Layout.tsx             # App shell with animated sidebar
-│   ├── NavBar.tsx             # Minimal top bar
-│   ├── NotesList.tsx          # Sidebar navigation
-│   ├── UserPresence.tsx       # Collaborator avatars
-│   └── Dashboard/
-│       ├── PinnedNotes.tsx    # Pinned notes section
-│       ├── RecentNotes.tsx    # Recent notes grid
-│       ├── CategoryChips.tsx  # Category filter pills
-│       └── ActivityFeed.tsx   # Team activity feed
-├── lib/
-│   ├── api.ts                 # All Supabase data access (~40 functions)
-│   └── supabase/              # Client utilities + middleware
-├── pages/                     # Next.js pages
-├── styles/
-│   ├── theme.css              # Design system variables + animations
-│   └── editor.css             # Draft.js typography overrides
-└── middleware.ts              # Auth + team-setup route protection
-```
 
 ## Database Schema
 
@@ -140,13 +105,17 @@ An IT team notes app for quickly saving and sharing the things you need to remem
 | `teams` | Teams with invite codes |
 | `team_members` | Team membership with roles (admin/member) |
 | `notebooks` | Note collections scoped to teams |
-| `notes` | Content with locking, pinning, versioning, edit tracking |
-| `categories` | Team-scoped colored categories |
-| `note_categories` | Many-to-many note-category assignments |
+| `notes` | HTML content with locking, pinning, versioning, edit tracking |
 | `images` | Note image metadata |
 | `hidden_notes` | Per-user note hiding |
 | `activity_log` | Team action history |
-| `collaborators` | Notebook sharing permissions |
+| `categories` | Team-scoped categories (currently unused in UI) |
+| `note_categories` | Note-category assignments (currently unused in UI) |
+| `collaborators` | Notebook sharing permissions (legacy) |
+
+## RLS Architecture
+
+All RLS policies use `profiles.team_id` for team membership checks — no cross-table recursive policies. This avoids the infinite recursion issues that occur when policies on table A check table B which has policies checking table A.
 
 ## License
 
