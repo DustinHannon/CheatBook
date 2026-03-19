@@ -31,23 +31,42 @@ const ProfilePage: NextPage = () => {
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
+    if (!user?.id) return;
     const loadData = async () => {
       try {
-        const [profileData, statsData, notebooksData] = await Promise.all([
-          getProfile(supabase),
-          getUserStats(supabase),
-          getNotebooks(supabase),
+        // Fetch profile directly using user.id from AuthContext
+        const { data: profileData, error: profileErr } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (profileErr) {
+          console.error('Profile fetch error:', profileErr);
+          return;
+        }
+
+        if (profileData) {
+          setProfile(profileData);
+          setName(profileData.name || '');
+        }
+
+        // Fetch stats
+        const [nbCount, noteCount] = await Promise.all([
+          supabase.from('notebooks').select('id', { count: 'exact' }).eq('owner_id', user.id),
+          supabase.from('notes').select('id', { count: 'exact' }).eq('owner_id', user.id),
         ]);
-        setProfile(profileData);
-        setName(profileData.name || '');
-        setStats(statsData);
-        setNotebooks(notebooksData);
+        setStats({ notebookCount: nbCount.count || 0, noteCount: noteCount.count || 0 });
+
+        // Fetch notebooks for layout
+        const nbs = await getNotebooks(supabase);
+        setNotebooks(nbs);
       } catch (err) {
         console.error('Profile load error:', err);
       }
     };
-    if (user) loadData();
-  }, [user]);
+    loadData();
+  }, [user?.id]);
 
   const handleSave = async () => {
     setIsSaving(true);
