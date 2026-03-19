@@ -7,9 +7,7 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../components/AuthContext';
 import { createClient } from '../lib/supabase/client';
 import {
-  getProfile,
   updateProfile,
-  getUserStats,
   uploadAvatar,
   getNotebooks,
   Profile,
