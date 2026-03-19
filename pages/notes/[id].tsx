@@ -13,43 +13,34 @@ import {
   getNote,
   deleteNote as apiDeleteNote,
   uploadNoteImage,
-  getCategories,
 } from '../../lib/api';
-import { useTeam } from '../../components/TeamContext';
-import type { Category } from '../../lib/api';
 
 const supabase = createClient();
 
 export default function NotePage() {
   const { user } = useAuth();
-  const { team } = useTeam();
   const router = useRouter();
   const { id } = router.query;
 
   const [note, setNote] = useState<any>(null);
   const [notebooks, setNotebooks] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
-  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [selectedNotebookId, setSelectedNotebookId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch notebooks and categories
+  // Fetch notebooks
   useEffect(() => {
     if (!user) return;
     const fetchData = async () => {
       try {
         const nbs = await getNotebooks(supabase);
         setNotebooks(nbs);
-        if (team?.id) {
-          const cats = await getCategories(supabase, team.id);
-          setAllCategories(cats);
-        }
       } catch (err) {
-        console.error('Error fetching data:', err);
+        console.error('Error fetching notebooks:', err);
       }
     };
     fetchData();
-  }, [user, team?.id]);
+  }, [user]);
 
   // Fetch note by ID
   useEffect(() => {
@@ -166,7 +157,6 @@ export default function NotePage() {
               onSave={handleSaveNote}
               onDelete={handleDeleteNote}
               onDuplicate={handleDuplicateNote}
-              allCategories={allCategories}
             />
           </ImagePaste>
         ) : (

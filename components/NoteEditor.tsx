@@ -7,9 +7,6 @@ import {
   LockClosedIcon,
 } from '@heroicons/react/24/outline';
 import UserPresence from './UserPresence';
-import FloatingToolbar from './FloatingToolbar';
-import CategoryBadge from './CategoryBadge';
-import CategoryPicker from './CategoryPicker';
 import { useRealtime, getUserColor } from './RealtimeContext';
 import { useAuth } from './AuthContext';
 import { createClient } from '../lib/supabase/client';
@@ -20,10 +17,7 @@ import {
   lockNote,
   unlockNote,
   hideNote,
-  addNoteCategory,
-  removeNoteCategory,
 } from '../lib/api';
-import type { Category } from '../lib/api';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 const supabase = createClient();
@@ -59,7 +53,6 @@ interface NoteEditorProps {
   onShare?: (noteId: string) => void;
   onDuplicate?: (noteId: string) => void;
   readOnly?: boolean;
-  allCategories?: Category[];
 }
 
 function relativeTime(dateStr: string): string {
@@ -86,7 +79,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   onShare,
   onDuplicate,
   readOnly = false,
-  allCategories = [],
 }) => {
   const [title, setTitle] = useState('');
   const [editorState, setEditorState] = useState(EditorState.createEmpty());
@@ -98,14 +90,12 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   const [typingUsers, setTypingUsers] = useState<ActiveUser[]>([]);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
-  // New state for enhancements
+  // Enhancement state
   const [isPinned, setIsPinned] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [overrideLock, setOverrideLock] = useState(false);
-  const [categories, setCategories] = useState<Array<{ id: string; name: string; color: string }>>([]);
 
   const { user } = useAuth();
   const { joinNote, leaveNote } = useRealtime();
@@ -217,14 +207,12 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       setIsPinned(!!note.is_pinned);
       setIsLocked(!!note.is_locked);
       setOverrideLock(false);
-      setCategories(note.categories || []);
     } else {
       setTitle('');
       setEditorState(EditorState.createEmpty());
       setIsPinned(false);
       setIsLocked(false);
       setOverrideLock(false);
-      setCategories([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id]);
@@ -242,11 +230,9 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, editorState]);
 
-  // Track selection for floating toolbar
+  // Track selection for typing indicators
   useEffect(() => {
     const selection = editorState.getSelection();
-    const hasSelection = !selection.isCollapsed();
-    setShowFloatingToolbar(hasSelection);
     lastSelectionState.current = selection;
 
     if (!channelRef.current || !note?.id || effectiveReadOnly || !user) return;
@@ -369,31 +355,35 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     setShowMenu(false);
   };
 
-  // Category toggle handler
-  const handleCategoryToggle = async (categoryId: string, isAdding: boolean) => {
-    if (!note) return;
-    try {
-      if (isAdding) {
-        await addNoteCategory(supabase, note.id, categoryId);
-        const cat = allCategories.find((c) => c.id === categoryId);
-        if (cat) {
-          setCategories((prev) => [...prev, { id: cat.id, name: cat.name, color: cat.color }]);
-        }
-      } else {
-        await removeNoteCategory(supabase, note.id, categoryId);
-        setCategories((prev) => prev.filter((c) => c.id !== categoryId));
-      }
-    } catch (error) {
-      console.error('Error toggling category:', error);
-    }
-  };
-
   const currentInlineStyles = editorState.getCurrentInlineStyle();
   const currentBlockType = RichUtils.getCurrentBlockType(editorState);
 
+  // Toolbar button helper
+  const ToolbarButton: React.FC<{
+    active: boolean;
+    onMouseDown: (e: React.MouseEvent) => void;
+    children: React.ReactNode;
+    className?: string;
+  }> = ({ active, onMouseDown, children, className = '' }) => (
+    <button
+      onMouseDown={onMouseDown}
+      className={`px-2.5 py-1.5 rounded text-sm transition-colors ${
+        active
+          ? 'text-accent bg-accent-muted'
+          : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover'
+      } ${className}`}
+    >
+      {children}
+    </button>
+  );
+
+  const ToolbarDivider = () => (
+    <div className="w-px h-5 bg-border-default mx-1" />
+  );
+
   return (
     <div className="flex flex-col h-full bg-bg-base relative">
-      {/* Top bar — subtle, minimal */}
+      {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-border-subtle">
         <div className="flex items-center gap-3">
           {/* Connection + save status */}
@@ -496,6 +486,71 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
         </div>
       </div>
 
+      {/* Persistent formatting toolbar */}
+      <div className="flex items-center gap-1 px-6 py-2 border-b border-border-subtle bg-bg-raised">
+        {/* Inline styles: Bold, Italic, Underline */}
+        <ToolbarButton
+          active={currentInlineStyles.has('BOLD')}
+          onMouseDown={(e) => { e.preventDefault(); toggleInlineStyle('BOLD'); }}
+        >
+          <span className="font-bold">B</span>
+        </ToolbarButton>
+        <ToolbarButton
+          active={currentInlineStyles.has('ITALIC')}
+          onMouseDown={(e) => { e.preventDefault(); toggleInlineStyle('ITALIC'); }}
+        >
+          <span className="italic">I</span>
+        </ToolbarButton>
+        <ToolbarButton
+          active={currentInlineStyles.has('UNDERLINE')}
+          onMouseDown={(e) => { e.preventDefault(); toggleInlineStyle('UNDERLINE'); }}
+        >
+          <span className="underline">U</span>
+        </ToolbarButton>
+
+        <ToolbarDivider />
+
+        {/* Headings */}
+        <ToolbarButton
+          active={currentBlockType === 'header-one'}
+          onMouseDown={(e) => { e.preventDefault(); toggleBlockType('header-one'); }}
+        >
+          H1
+        </ToolbarButton>
+        <ToolbarButton
+          active={currentBlockType === 'header-two'}
+          onMouseDown={(e) => { e.preventDefault(); toggleBlockType('header-two'); }}
+        >
+          H2
+        </ToolbarButton>
+
+        <ToolbarDivider />
+
+        {/* Lists */}
+        <ToolbarButton
+          active={currentBlockType === 'unordered-list-item'}
+          onMouseDown={(e) => { e.preventDefault(); toggleBlockType('unordered-list-item'); }}
+        >
+          &bull; List
+        </ToolbarButton>
+        <ToolbarButton
+          active={currentBlockType === 'ordered-list-item'}
+          onMouseDown={(e) => { e.preventDefault(); toggleBlockType('ordered-list-item'); }}
+        >
+          1. List
+        </ToolbarButton>
+
+        <ToolbarDivider />
+
+        {/* Code block */}
+        <ToolbarButton
+          active={currentBlockType === 'code-block'}
+          onMouseDown={(e) => { e.preventDefault(); toggleBlockType('code-block'); }}
+        >
+          {'{ }'}
+        </ToolbarButton>
+      </div>
+
       {/* Lock banner */}
       {isLocked && !overrideLock && (
         <div className="bg-accent-muted border border-accent-line rounded-lg px-4 py-3 mx-6 mt-3 flex items-center justify-between">
@@ -512,16 +567,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
         </div>
       )}
 
-      {/* Floating toolbar */}
-      <FloatingToolbar
-        editorRef={editorContainerRef}
-        onToggleInlineStyle={toggleInlineStyle}
-        onToggleBlockType={toggleBlockType}
-        currentInlineStyles={new Set(currentInlineStyles.toArray())}
-        currentBlockType={currentBlockType}
-        isVisible={showFloatingToolbar}
-      />
-
       {/* Editor content */}
       <div
         ref={editorContainerRef}
@@ -535,24 +580,9 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
             value={title}
             onChange={(e) => { setTitle(e.target.value); setSaveStatus('unsaved'); }}
             placeholder="Untitled"
-            className="w-full text-display-md bg-transparent border-none outline-none placeholder:text-text-tertiary mb-4"
+            className="w-full text-display-md bg-transparent border-none outline-none placeholder:text-text-tertiary mb-8"
             readOnly={effectiveReadOnly}
           />
-
-          {/* Category badges */}
-          <div className="flex flex-wrap items-center gap-2 mb-8">
-            {categories.map((cat) => (
-              <CategoryBadge key={cat.id} name={cat.name} color={cat.color} size="sm" />
-            ))}
-            {!effectiveReadOnly && (
-              <CategoryPicker
-                noteId={note?.id || ''}
-                currentCategories={categories}
-                allCategories={allCategories.map((c) => ({ id: c.id, name: c.name, color: c.color }))}
-                onToggle={handleCategoryToggle}
-              />
-            )}
-          </div>
 
           {/* Rich text editor */}
           <div className="prose-editorial">

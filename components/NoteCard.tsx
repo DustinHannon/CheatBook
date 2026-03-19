@@ -1,13 +1,6 @@
 import React from 'react';
 import { LockClosedIcon } from '@heroicons/react/24/solid';
 import { MapPinIcon } from '@heroicons/react/24/solid';
-import CategoryBadge from './CategoryBadge';
-
-interface NoteCategory {
-  id: string;
-  name: string;
-  color: string;
-}
 
 export interface NoteCardNote {
   id: string;
@@ -17,14 +10,11 @@ export interface NoteCardNote {
   owner_name?: string;
   is_locked?: boolean;
   is_pinned?: boolean;
-  categories?: NoteCategory[];
 }
 
 interface NoteCardProps {
   note: NoteCardNote;
   onClick: () => void;
-  onPin?: () => void;
-  onHide?: () => void;
 }
 
 function extractPlainText(content: string): string {
@@ -67,28 +57,17 @@ function formatRelativeTime(dateString: string): string {
   }
 }
 
-const NoteCard: React.FC<NoteCardProps> = ({ note, onClick, onPin, onHide }) => {
+const NoteCard: React.FC<NoteCardProps> = ({ note, onClick }) => {
   const plainText = extractPlainText(note.content || '');
   const truncatedText = plainText.length > 120
     ? plainText.substring(0, 120) + '...'
     : plainText;
-
-  const handlePin = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onPin?.();
-  };
-
-  const handleHide = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onHide?.();
-  };
 
   return (
     <div
       onClick={onClick}
       className="bg-bg-raised border border-border-subtle rounded-lg p-5 hover:bg-bg-surface-hover hover:-translate-y-0.5 transition-all cursor-pointer"
     >
-      {/* Title row */}
       <div className="flex items-center gap-2">
         <h3 className="font-medium text-text-primary truncate flex-1">
           {note.title || 'Untitled'}
@@ -101,23 +80,12 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onClick, onPin, onHide }) => 
         )}
       </div>
 
-      {/* Content preview */}
       {truncatedText && (
         <p className="text-sm text-text-secondary mt-2 line-clamp-3">
           {truncatedText}
         </p>
       )}
 
-      {/* Categories */}
-      {note.categories && note.categories.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {note.categories.map((cat) => (
-            <CategoryBadge key={cat.id} name={cat.name} color={cat.color} />
-          ))}
-        </div>
-      )}
-
-      {/* Bottom row */}
       <div className="mt-3 flex items-center justify-between text-xs text-text-tertiary">
         <span>by {note.owner_name || 'Unknown'}</span>
         <span>{formatRelativeTime(note.updated_at)}</span>
