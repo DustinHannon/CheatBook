@@ -19,6 +19,7 @@ interface NoteCardProps {
 
 function extractPlainText(content: string): string {
   if (!content) return '';
+  // Try Draft.js JSON first
   try {
     const parsed = JSON.parse(content);
     if (parsed && Array.isArray(parsed.blocks)) {
@@ -28,9 +29,19 @@ function extractPlainText(content: string): string {
         .trim();
     }
   } catch {
-    // Not JSON, return as-is
+    // Not JSON
   }
-  return content;
+  // Strip HTML tags for TinyMCE content
+  return content
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function formatRelativeTime(dateString: string): string {

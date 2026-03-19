@@ -133,7 +133,14 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose }) => {
 
   const getContentPreview = (content: string | null): string => {
     if (!content) return 'No content';
-    const stripped = content.replace(/[#*_`~>\-\[\]()!|]/g, '').trim();
+    const stripped = content
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\s+/g, ' ')
+      .trim();
     return stripped.length > 120 ? stripped.substring(0, 120) + '...' : stripped;
   };
 
