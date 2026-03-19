@@ -103,6 +103,8 @@ export default function Dashboard() {
       if (error) throw error;
       setNotebooks(prev => [{ ...nb, note_count: 0 }, ...prev]);
       setShowCreateNotebook(false);
+      // Auto-open create note dialog after creating first notebook
+      setTimeout(() => setShowCreateNote(true), 300);
     } catch (err: any) {
       const msg = err?.message || 'Failed to create notebook';
       console.error('Error creating notebook:', err);
@@ -220,18 +222,37 @@ export default function Dashboard() {
                 {/* Empty state */}
                 {!isLoading && recentNotes.length === 0 && (
                   <div className="text-center py-20 animate-fade-in">
-                    <h2 className="text-display-sm font-display text-text-primary mb-3">
-                      Welcome to CheatBook
-                    </h2>
-                    <p className="text-text-secondary mb-8 max-w-md mx-auto">
-                      Create your first notebook to start saving notes, scripts, IPs, and anything your IT team needs to remember.
-                    </p>
-                    <button
-                      onClick={() => setShowCreateNotebook(true)}
-                      className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-6 py-3 text-sm transition"
-                    >
-                      Create First Notebook
-                    </button>
+                    {notebooks.length === 0 ? (
+                      <>
+                        <h2 className="text-display-sm font-display text-text-primary mb-3">
+                          Welcome to CheatBook
+                        </h2>
+                        <p className="text-text-secondary mb-8 max-w-md mx-auto">
+                          Create your first notebook to start saving notes, scripts, IPs, and anything your IT team needs to remember.
+                        </p>
+                        <button
+                          onClick={() => setShowCreateNotebook(true)}
+                          className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-6 py-3 text-sm transition"
+                        >
+                          Create First Notebook
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <h2 className="text-display-sm font-display text-text-primary mb-3">
+                          No notes yet
+                        </h2>
+                        <p className="text-text-secondary mb-8 max-w-md mx-auto">
+                          You have {notebooks.length} notebook{notebooks.length > 1 ? 's' : ''}. Create your first note to get started.
+                        </p>
+                        <button
+                          onClick={() => setShowCreateNote(true)}
+                          className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-6 py-3 text-sm transition"
+                        >
+                          Create First Note
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
