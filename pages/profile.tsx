@@ -260,7 +260,12 @@ const ProfilePage: NextPage = () => {
                   </div>
 
                   {/* Members list */}
-                  <div className="mt-4 space-y-2">
+                  <div className="mt-4 pt-4 border-t border-border-subtle">
+                    <div className="text-xs text-text-tertiary mb-3">Members</div>
+                    {teamMembers.length === 0 && (
+                      <p className="text-sm text-text-tertiary py-2">Loading members...</p>
+                    )}
+                    <div className="space-y-2">
                     {teamMembers.map(member => (
                       <div key={member.user_id} className="flex items-center justify-between py-2 px-1">
                         <div className="flex items-center gap-3">
@@ -323,6 +328,7 @@ const ProfilePage: NextPage = () => {
                         </div>
                       </div>
                     ))}
+                    </div>
                   </div>
 
                   {/* Invite member */}
