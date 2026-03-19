@@ -12,11 +12,14 @@ import {
   getNotebooks,
   Profile,
 } from '../lib/api';
+import { useTeam } from '../components/TeamContext';
+import { ClipboardDocumentIcon, UserMinusIcon } from '@heroicons/react/24/outline';
 
 const supabase = createClient();
 
 const ProfilePage: NextPage = () => {
   const { user, logout } = useAuth();
+  const { team, teamMembers, isAdmin, inviteMember, removeMember } = useTeam();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -27,6 +30,9 @@ const ProfilePage: NextPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteStatus, setInviteStatus] = useState('');
+  const [codeCopied, setCodeCopied] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -222,6 +228,121 @@ const ProfilePage: NextPage = () => {
                 </div>
               </div>
             </div>
+
+            {/* Team section */}
+            {team && (
+              <div className="mt-12">
+                <span className="section-label">Team</span>
+                <div className="mt-4 bg-bg-raised border border-border-subtle rounded-lg p-5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-text-primary">{team.name}</h3>
+                    <span className="text-xs text-text-tertiary">{teamMembers.length} member{teamMembers.length !== 1 ? 's' : ''}</span>
+                  </div>
+
+                  {/* Invite code */}
+                  <div className="mt-4 p-3 bg-bg-base rounded-lg border border-border-subtle">
+                    <div className="text-xs text-text-tertiary mb-1">Invite code — share this with teammates</div>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 font-mono text-sm text-accent tracking-wider">{team.invite_code}</code>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(team.invite_code);
+                          setCodeCopied(true);
+                          setTimeout(() => setCodeCopied(false), 2000);
+                        }}
+                        className="p-1.5 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface-hover transition-colors"
+                        title="Copy invite code"
+                      >
+                        <ClipboardDocumentIcon className="w-4 h-4" />
+                      </button>
+                      {codeCopied && <span className="text-xs text-accent">Copied!</span>}
+                    </div>
+                  </div>
+
+                  {/* Members list */}
+                  <div className="mt-4 space-y-2">
+                    {teamMembers.map(member => (
+                      <div key={member.user_id} className="flex items-center justify-between py-2 px-1">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-bg-base text-sm font-semibold">
+                            {(member.profiles?.name || member.profiles?.email || '?').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="text-sm text-text-primary">{member.profiles?.name || member.profiles?.email || 'Unknown'}</div>
+                            <div className="text-xs text-text-tertiary">{member.profiles?.email}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            member.role === 'admin'
+                              ? 'bg-accent-muted text-accent'
+                              : 'bg-bg-surface text-text-tertiary'
+                          }`}>
+                            {member.role}
+                          </span>
+                          {isAdmin && member.user_id !== user?.id && (
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Remove ${member.profiles?.name || member.profiles?.email}?`)) {
+                                  try {
+                                    await removeMember(member.user_id);
+                                  } catch (err) {
+                                    console.error('Failed to remove:', err);
+                                  }
+                                }
+                              }}
+                              className="p-1 rounded text-text-tertiary hover:text-status-error hover:bg-bg-surface-hover transition-colors"
+                              title="Remove member"
+                            >
+                              <UserMinusIcon className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Invite member */}
+                  {isAdmin && (
+                    <div className="mt-4 pt-4 border-t border-border-subtle">
+                      <div className="text-xs text-text-tertiary mb-2">Invite by email</div>
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          placeholder="colleague@company.com"
+                          className="flex-1 bg-bg-base border border-border-default rounded-lg px-3 py-2 text-text-primary placeholder:text-text-tertiary focus:border-accent focus:ring-0 focus:outline-none text-sm"
+                        />
+                        <button
+                          onClick={async () => {
+                            if (!inviteEmail.trim()) return;
+                            setInviteStatus('');
+                            try {
+                              await inviteMember(inviteEmail.trim());
+                              setInviteEmail('');
+                              setInviteStatus('Invited!');
+                              setTimeout(() => setInviteStatus(''), 3000);
+                            } catch (err: any) {
+                              setInviteStatus(err?.message || 'Failed');
+                              setTimeout(() => setInviteStatus(''), 3000);
+                            }
+                          }}
+                          className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-4 py-2 text-sm transition"
+                        >
+                          Invite
+                        </button>
+                      </div>
+                      {inviteStatus && (
+                        <div className={`mt-2 text-xs ${inviteStatus === 'Invited!' ? 'text-status-success' : 'text-status-error'}`}>
+                          {inviteStatus}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Danger zone */}
             <div className="mt-12">
