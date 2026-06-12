@@ -13,6 +13,9 @@ import {
   Profile,
 } from '../lib/api';
 import { useTeam } from '../components/TeamContext';
+import { useToast } from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
+import type { TeamMember } from '../lib/api';
 import { ClipboardDocumentIcon, UserMinusIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 
 const supabase = createClient();
@@ -20,8 +23,10 @@ const supabase = createClient();
 const ProfilePage: NextPage = () => {
   const { user, logout } = useAuth();
   const { team, teamMembers, isAdmin, inviteMember, removeMember, updateRole } = useTeam();
+  const { showToast } = useToast();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [name, setName] = useState('');
@@ -99,10 +104,12 @@ const ProfilePage: NextPage = () => {
     try {
       const avatarUrl = await uploadAvatar(supabase, file);
       setProfile((prev) => (prev ? { ...prev, avatar: avatarUrl } : prev));
-    } catch {
-      // Upload failed silently
+      showToast('Avatar updated.', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to upload avatar.', 'error');
     } finally {
       setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -122,7 +129,13 @@ const ProfilePage: NextPage = () => {
       <Head>
         <title>Settings - CheatBook</title>
       </Head>
-      <Layout notebooks={notebooks}>
+      <Layout
+        notebooks={notebooks}
+        onSelectNotebook={(nbId) => router.push(`/notebooks/${nbId}`)}
+        onSelectNote={(noteId) => router.push(`/notes/${noteId}`)}
+        onCreateNote={(nbId) => router.push(nbId ? `/notebooks/${nbId}` : '/')}
+        onCreateNotebook={() => router.push('/')}
+      >
         <div className="bg-bg-base min-h-full">
           <div className="max-w-xl mx-auto px-6 py-12">
             {/* Title */}
@@ -284,8 +297,10 @@ const ProfilePage: NextPage = () => {
                                 const newRole = member.role === 'admin' ? 'member' : 'admin';
                                 try {
                                   await updateRole(member.user_id, newRole);
+                                  showToast(`Role updated to ${newRole}.`, 'success');
                                 } catch (err) {
                                   console.error('Failed to update role:', err);
+                                  showToast(err instanceof Error ? err.message : 'Failed to update role.', 'error');
                                 }
                               }}
                               className={`text-xs px-2 py-0.5 rounded-full cursor-pointer transition-colors ${
@@ -310,15 +325,7 @@ const ProfilePage: NextPage = () => {
                           )}
                           {isAdmin && member.user_id !== user?.id && (
                             <button
-                              onClick={async () => {
-                                if (confirm(`Remove ${member.profiles?.name || member.profiles?.email}?`)) {
-                                  try {
-                                    await removeMember(member.user_id);
-                                  } catch (err) {
-                                    console.error('Failed to remove:', err);
-                                  }
-                                }
-                              }}
+                              onClick={() => setRemoveTarget(member)}
                               className="p-1 rounded text-text-tertiary hover:text-status-error hover:bg-bg-surface-hover transition-colors"
                               title="Remove member"
                             >
@@ -387,6 +394,25 @@ const ProfilePage: NextPage = () => {
             </div>
           </div>
         </div>
+
+        <ConfirmDialog
+          isOpen={removeTarget !== null}
+          onClose={() => setRemoveTarget(null)}
+          onConfirm={async () => {
+            if (!removeTarget) return;
+            try {
+              await removeMember(removeTarget.user_id);
+              showToast('Member removed.', 'success');
+            } catch (err) {
+              console.error('Failed to remove:', err);
+              showToast(err instanceof Error ? err.message : 'Failed to remove member.', 'error');
+            }
+          }}
+          title="Remove member"
+          message={`Remove ${removeTarget?.profiles?.name || removeTarget?.profiles?.email || 'this member'} from the team?`}
+          confirmLabel="Remove"
+          confirmVariant="danger"
+        />
       </Layout>
     </ProtectedRoute>
   );

@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useId } from 'react';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -19,6 +19,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   confirmLabel = 'Confirm',
   confirmVariant = 'default',
 }) => {
+  const titleId = useId();
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -51,8 +52,13 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       />
 
       {/* Modal */}
-      <div className="relative bg-bg-surface border border-border-default rounded-xl shadow-lg max-w-sm w-full mx-4 p-6 animate-confirm-scale-in">
-        <h3 className="font-semibold text-text-primary text-lg">{title}</h3>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative bg-bg-surface border border-border-default rounded-xl shadow-lg max-w-sm w-full mx-4 p-6 animate-confirm-scale-in"
+      >
+        <h3 id={titleId} className="font-semibold text-text-primary text-lg">{title}</h3>
         <p className="text-sm text-text-secondary mt-2">{message}</p>
 
         <div className="mt-6 flex gap-3 justify-end">

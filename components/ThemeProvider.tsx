@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext } from 'react';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 
 type ThemeProviderProps = {
@@ -28,17 +28,12 @@ export const useTheme = () => useContext(ThemeContext);
  * Wraps the application and provides theme context
  */
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  // We'll use next-themes for SSR-friendly theme management
-  const [mounted, setMounted] = useState(false);
-
-  // Effect for client-side mounting
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
+  // next-themes injects a blocking pre-paint script that sets data-theme on
+  // <html>, so children render unconditionally — gating on a client mount flag
+  // would blank the entire app on SSR and first paint.
   return (
     <NextThemesProvider attribute="data-theme" defaultTheme="dark" enableSystem={false}>
-      {mounted && children}
+      {children}
     </NextThemesProvider>
   );
 };

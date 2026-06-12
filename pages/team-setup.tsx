@@ -1,4 +1,4 @@
-import React, { useState, FormEvent } from 'react';
+import React, { useState, useEffect, FormEvent } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useAuth } from '../components/AuthContext';
@@ -6,7 +6,7 @@ import { useTeam } from '../components/TeamContext';
 
 export default function TeamSetup() {
   const { user } = useAuth();
-  const { createTeam, joinTeam } = useTeam();
+  const { createTeam, joinTeam, team, needsTeamSetup, isLoading: isTeamLoading } = useTeam();
   const router = useRouter();
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
   const [teamName, setTeamName] = useState('');
@@ -44,7 +44,16 @@ export default function TeamSetup() {
     }
   };
 
+  // Bounce already-teamed users back to the dashboard so they can't re-create or
+  // re-join (which would orphan their original team membership).
+  useEffect(() => {
+    if (!isTeamLoading && user && team && !needsTeamSetup) {
+      router.replace('/');
+    }
+  }, [isTeamLoading, user, team, needsTeamSetup, router]);
+
   if (!user) return null;
+  if (isTeamLoading || (team && !needsTeamSetup)) return null;
 
   return (
     <>

@@ -34,7 +34,7 @@ interface NotesListProps {
   selectedNotebookId?: string;
   onSelectNote?: (noteId: string) => void;
   onSelectNotebook?: (notebookId: string) => void;
-  onCreateNote: () => void;
+  onCreateNote: (notebookId?: string) => void;
   onCreateNotebook: () => void;
 }
 
@@ -116,7 +116,7 @@ const NotesList: React.FC<NotesListProps> = ({
         <span className="section-label">LIBRARY</span>
         <div className="flex items-center gap-1">
           <button
-            onClick={onCreateNote}
+            onClick={() => onCreateNote()}
             className="p-1.5 rounded-md text-text-tertiary hover:text-accent hover:bg-bg-surface-hover focus:outline-none"
             title="New note"
           >
@@ -251,7 +251,7 @@ const NotesList: React.FC<NotesListProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onCreateNote();
+                    onCreateNote(notebook.id);
                   }}
                   className="w-full text-left px-5 pl-12 py-2 hover:bg-bg-surface-hover flex items-center gap-1.5 text-text-tertiary hover:text-accent transition-colors"
                 >

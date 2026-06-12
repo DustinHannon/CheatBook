@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode } from 'react';
 import { createClient } from '../lib/supabase/client';
 import { useAuth } from './AuthContext';
-import type { Team, TeamMember } from '../lib/api';
+import { inviteTeamMember, removeTeamMember, updateMemberRole, type Team, type TeamMember } from '../lib/api';
 
 interface TeamContextType {
   team: Team | null;
@@ -132,25 +132,24 @@ export const TeamProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await fetchTeamData();
   }, [fetchTeamData]);
 
+  // Member mutations delegate to the lib/api helpers, which call SECURITY DEFINER
+  // RPCs that enforce admin authorization server-side and update both team_members
+  // and profiles atomically. Errors propagate so the UI can surface failures.
   const handleInviteMember = useCallback(async (email: string) => {
     if (!team) throw new Error('No team');
-    const { data: profile } = await supabase.from('profiles').select('id').eq('email', email).single();
-    if (!profile) throw new Error('User not found');
-    await supabase.from('team_members').insert({ team_id: team.id, user_id: profile.id, role: 'member' });
-    await supabase.from('profiles').update({ team_id: team.id }).eq('id', profile.id);
+    await inviteTeamMember(supabase, team.id, email);
     await fetchTeamData();
   }, [team, fetchTeamData]);
 
   const handleRemoveMember = useCallback(async (userId: string) => {
     if (!team) throw new Error('No team');
-    await supabase.from('team_members').delete().eq('team_id', team.id).eq('user_id', userId);
-    await supabase.from('profiles').update({ team_id: null }).eq('id', userId);
+    await removeTeamMember(supabase, team.id, userId);
     await fetchTeamData();
   }, [team, fetchTeamData]);
 
   const handleUpdateRole = useCallback(async (userId: string, role: string) => {
     if (!team) throw new Error('No team');
-    await supabase.from('team_members').update({ role }).eq('team_id', team.id).eq('user_id', userId);
+    await updateMemberRole(supabase, team.id, userId, role);
     await fetchTeamData();
   }, [team, fetchTeamData]);
 

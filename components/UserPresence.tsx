@@ -15,10 +15,11 @@ interface UserPresenceProps {
 const UserPresence: React.FC<UserPresenceProps> = ({ user, size = 'medium' }) => {
   const initial = useMemo(() => user.name.charAt(0).toUpperCase(), [user.name]);
 
-  const isActive = useMemo(() => {
-    const diff = (new Date().getTime() - new Date(user.last_active).getTime()) / 1000;
-    return diff < 60;
-  }, [user.last_active]);
+  // Presence membership IS "active": the realtime channel rebuilds this list on
+  // every sync and drops users on leave, so any user rendered here is currently
+  // on the note. (online_at/last_active is fixed at join time — not a heartbeat —
+  // so inferring freshness from it would wrongly grey out still-connected users.)
+  const isActive = true;
 
   const dims = useMemo(() => {
     switch (size) {

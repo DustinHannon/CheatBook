@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import NavBar from './NavBar';
 import NotesList from './NotesList';
 import CommandPalette from './CommandPalette';
+import { useTeam } from './TeamContext';
+import { createClient } from '../lib/supabase/client';
+import { getAllTeamNotes } from '../lib/api';
+
+const supabase = createClient();
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,7 +18,7 @@ interface LayoutProps {
   selectedNotebookId?: string;
   onSelectNote?: (noteId: string) => void;
   onSelectNotebook?: (notebookId: string) => void;
-  onCreateNote?: () => void;
+  onCreateNote?: (notebookId?: string) => void;
   onCreateNotebook?: () => void;
 }
 
@@ -31,6 +37,23 @@ const Layout: React.FC<LayoutProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileView, setIsMobileView] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // The sidebar derives its sections (recent / per-notebook / uncategorized)
+  // from the FULL team note set, independent of whichever page is mounted (a
+  // note/notebook page only loads a scoped subset for its own body).
+  const { team } = useTeam();
+  const router = useRouter();
+  const [sidebarNotes, setSidebarNotes] = useState<any[]>([]);
+  // Re-fetch on route change too (not just team change) so the sidebar reflects
+  // notes created/edited/deleted/pinned on the page you just navigated from.
+  useEffect(() => {
+    if (!team?.id) { setSidebarNotes([]); return; }
+    let cancelled = false;
+    getAllTeamNotes(supabase, team.id)
+      .then((n) => { if (!cancelled) setSidebarNotes(n); })
+      .catch(() => { /* sidebar falls back to the page-provided notes */ });
+    return () => { cancelled = true; };
+  }, [team?.id, router.asPath]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -92,7 +115,7 @@ const Layout: React.FC<LayoutProps> = ({
             >
               <NotesList
                 notebooks={notebooks}
-                notes={notes}
+                notes={sidebarNotes.length > 0 ? sidebarNotes : notes}
                 selectedNoteId={selectedNoteId}
                 selectedNotebookId={selectedNotebookId}
                 onSelectNote={onSelectNote}

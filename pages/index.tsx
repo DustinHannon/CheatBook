@@ -4,16 +4,19 @@ import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import ProtectedRoute from '../components/ProtectedRoute';
 import RecentNotes from '../components/Dashboard/RecentNotes';
+import PinnedNotes from '../components/Dashboard/PinnedNotes';
 import ActivityFeed from '../components/Dashboard/ActivityFeed';
 import InputDialog from '../components/InputDialog';
 import NotebookPickerDialog from '../components/NotebookPickerDialog';
 import { useAuth } from '../components/AuthContext';
 import { useTeam } from '../components/TeamContext';
+import { useToast } from '../components/Toast';
 import { createClient } from '../lib/supabase/client';
 import {
   getNotebooks,
   getRecentTeamNotes,
   getRecentActivity,
+  getPinnedNotes,
 } from '../lib/api';
 import type { Note, ActivityLogEntry } from '../lib/api';
 import { PlusIcon } from '@heroicons/react/24/outline';
@@ -30,12 +33,15 @@ function getGreeting(): string {
 export default function Dashboard() {
   const { user } = useAuth();
   const { team, needsTeamSetup, isLoading: isTeamLoading } = useTeam();
+  const { showToast } = useToast();
   const router = useRouter();
 
   const [notebooks, setNotebooks] = useState<any[]>([]);
   const [recentNotes, setRecentNotes] = useState<Note[]>([]);
+  const [pinnedNotes, setPinnedNotes] = useState<Note[]>([]);
   const [activities, setActivities] = useState<ActivityLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Dialog states
   const [showCreateNotebook, setShowCreateNotebook] = useState(false);
@@ -52,25 +58,39 @@ export default function Dashboard() {
 
   // Fetch dashboard data
   useEffect(() => {
-    if (!user || !team) return;
+    if (!user) return;
+    // Wait for TeamContext to resolve before deciding what to render.
+    if (isTeamLoading) return;
+    // No team to fetch for — stop the spinner instead of showing skeletons forever.
+    if (!team) { setIsLoading(false); return; }
+
+    let cancelled = false;
+    setIsLoading(true);
+    setLoadError(null);
     const fetchAll = async () => {
       try {
-        const [nbs, recent, activity] = await Promise.all([
+        const [nbs, recent, pinned, activity] = await Promise.all([
           getNotebooks(supabase),
           getRecentTeamNotes(supabase, team.id, 12),
+          getPinnedNotes(supabase, team.id),
           getRecentActivity(supabase, team.id, 20),
         ]);
+        if (cancelled) return;
         setNotebooks(nbs);
         setRecentNotes(recent);
+        setPinnedNotes(pinned);
         setActivities(activity);
       } catch (err) {
+        if (cancelled) return;
         console.error('Error loading dashboard:', err);
+        setLoadError(err instanceof Error ? err.message : 'Failed to load your dashboard.');
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
     fetchAll();
-  }, [user, team]);
+    return () => { cancelled = true; };
+  }, [user, team, isTeamLoading]);
 
   const handleCreateNotebook = async (title: string) => {
     setCreateError(null);
@@ -83,6 +103,7 @@ export default function Dashboard() {
       if (error) throw error;
       setNotebooks(prev => [{ ...nb, note_count: 0 }, ...prev]);
       setShowCreateNotebook(false);
+      showToast('Notebook created.', 'success');
     } catch (err: any) {
       setCreateError(err?.message || 'Failed to create notebook');
     }
@@ -101,13 +122,17 @@ export default function Dashboard() {
       router.push(`/notes/${newNote.id}`);
     } catch (err) {
       console.error('Error creating note:', err);
+      showToast('Failed to create note.', 'error');
     } finally {
       setIsCreatingNote(false);
     }
   };
 
-  const handleNewNoteClick = () => {
-    if (notebooks.length === 0) {
+  const handleNewNoteClick = (notebookId?: string) => {
+    // An explicit notebook (e.g. sidebar "Add note" under a notebook) creates there.
+    if (notebookId) {
+      quickCreateNote(notebookId);
+    } else if (notebooks.length === 0) {
       setShowCreateNotebook(true);
     } else if (notebooks.length === 1) {
       quickCreateNote(notebooks[0].id);
@@ -148,7 +173,7 @@ export default function Dashboard() {
                 )}
               </div>
               <button
-                onClick={handleNewNoteClick}
+                onClick={() => handleNewNoteClick()}
                 disabled={isCreatingNote}
                 className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-5 py-2.5 text-sm transition flex items-center gap-2 disabled:opacity-50"
               >
@@ -156,6 +181,29 @@ export default function Dashboard() {
                 {isCreatingNote ? 'Creating...' : 'New Note'}
               </button>
             </div>
+
+            {/* Load error */}
+            {!isLoading && loadError && (
+              <div className="bg-status-error/10 border border-status-error/20 text-status-error rounded-lg px-4 py-3 text-sm mb-6 flex items-center justify-between">
+                <span>{loadError}</span>
+                <button
+                  onClick={() => router.reload()}
+                  className="text-status-error hover:underline text-sm font-medium"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Pinned Notes */}
+            {!isLoading && pinnedNotes.length > 0 && (
+              <div className="animate-slide-up mb-8">
+                <PinnedNotes
+                  notes={pinnedNotes as any}
+                  onNoteClick={(id) => router.push(`/notes/${id}`)}
+                />
+              </div>
+            )}
 
             {/* Recent Notes */}
             <div className="animate-slide-up">
@@ -167,7 +215,7 @@ export default function Dashboard() {
             </div>
 
             {/* Empty state */}
-            {!isLoading && recentNotes.length === 0 && notebooks.length === 0 && (
+            {!isLoading && !loadError && recentNotes.length === 0 && notebooks.length === 0 && (
               <div className="text-center py-16 animate-fade-in">
                 <h2 className="text-display-sm font-display text-text-primary mb-3">
                   Welcome to CheatBook
@@ -185,7 +233,7 @@ export default function Dashboard() {
             )}
 
             {/* Has notebooks but no notes */}
-            {!isLoading && recentNotes.length === 0 && notebooks.length > 0 && (
+            {!isLoading && !loadError && recentNotes.length === 0 && notebooks.length > 0 && (
               <div className="text-center py-16 animate-fade-in">
                 <h2 className="text-display-sm font-display text-text-primary mb-3">
                   Ready to go
@@ -194,7 +242,7 @@ export default function Dashboard() {
                   Select a notebook in the sidebar and create your first note.
                 </p>
                 <button
-                  onClick={handleNewNoteClick}
+                  onClick={() => handleNewNoteClick()}
                   disabled={isCreatingNote}
                   className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-6 py-3 text-sm transition disabled:opacity-50"
                 >

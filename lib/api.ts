@@ -237,17 +237,42 @@ export async function createNote(supabase: SupabaseClient, notebookId: string, t
   return data;
 }
 
-export async function updateNote(supabase: SupabaseClient, noteId: string, updates: { title?: string; content?: string; version?: number }) {
+/** Thrown when an optimistic-concurrency save loses to a newer version. */
+export class NoteConflictError extends Error {
+  constructor() {
+    super('This note was changed by someone else.');
+    this.name = 'NoteConflictError';
+  }
+}
+
+export async function updateNote(
+  supabase: SupabaseClient,
+  noteId: string,
+  updates: { title?: string; content?: string },
+  expectedVersion?: number,
+) {
   const user = await getCurrentUser(supabase);
 
-  const { data, error } = await supabase
-    .from('notes')
-    .update({ ...updates, last_edited_by: user.id })
-    .eq('id', noteId)
-    .select()
-    .single();
+  const payload: { title?: string; content?: string; last_edited_by: string; version?: number } = {
+    ...updates,
+    last_edited_by: user.id,
+  };
+  // Optimistic concurrency: bump version and only write if the row is still at
+  // the version we last read, so a concurrent editor's changes aren't clobbered.
+  if (expectedVersion != null) payload.version = expectedVersion + 1;
 
-  if (error) throw error;
+  let query = supabase.from('notes').update(payload).eq('id', noteId);
+  if (expectedVersion != null) query = query.eq('version', expectedVersion);
+
+  const { data, error } = await query.select().single();
+
+  if (error) {
+    // PGRST116 = zero rows returned: the version guard didn't match → conflict.
+    if (expectedVersion != null && (error as { code?: string }).code === 'PGRST116') {
+      throw new NoteConflictError();
+    }
+    throw error;
+  }
   return data;
 }
 
@@ -264,11 +289,16 @@ export async function searchNotes(supabase: SupabaseClient, query: string) {
   const teamId = await getUserTeamId(supabase);
   if (!teamId) return [];
 
+  // Escape backslash and double-quote, then wrap the value in double quotes so
+  // PostgREST treats commas/parens/dots in the user query literally instead of
+  // as .or() filter syntax (prevents filter injection). `%` stays a LIKE wildcard.
+  const term = query.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
   const { data, error } = await supabase
     .from('notes')
     .select('*, profiles:owner_id(name), notebooks!inner(team_id), note_categories(categories(*))')
     .eq('notebooks.team_id', teamId)
-    .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
+    .or(`title.ilike."%${term}%",content.ilike."%${term}%"`)
     .order('updated_at', { ascending: false })
     .limit(50);
 
@@ -367,7 +397,20 @@ export async function getUserStats(supabase: SupabaseClient) {
 }
 
 // ─── Image upload ────────────────────────────────────────────────────
+export const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB (matches the bucket limit)
+
+function assertValidImage(file: File) {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    throw new Error(`Unsupported image type${file.type ? ` (${file.type})` : ''}. Allowed: PNG, JPEG, GIF, WebP.`);
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_IMAGE_BYTES / 1024 / 1024} MB.`);
+  }
+}
+
 export async function uploadNoteImage(supabase: SupabaseClient, noteId: string, file: File) {
+  assertValidImage(file);
   const user = await getCurrentUser(supabase);
 
   const ext = file.name.split('.').pop();
@@ -400,6 +443,7 @@ export async function uploadNoteImage(supabase: SupabaseClient, noteId: string, 
 }
 
 export async function uploadAvatar(supabase: SupabaseClient, file: File) {
+  assertValidImage(file);
   const user = await getCurrentUser(supabase);
 
   const ext = file.name.split('.').pop();
@@ -460,53 +504,23 @@ export async function joinTeam(supabase: SupabaseClient, inviteCode: string): Pr
   return data;
 }
 
-export async function inviteTeamMember(supabase: SupabaseClient, teamId: string, email: string) {
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('email', email)
-    .single();
-
-  if (profileError || !profile) throw new Error('User not found with that email');
-
-  const { error: insertError } = await supabase
-    .from('team_members')
-    .insert({ team_id: teamId, user_id: profile.id, role: 'member' });
-
-  if (insertError) throw insertError;
-
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({ team_id: teamId })
-    .eq('id', profile.id);
-
-  if (updateError) throw updateError;
+// Team membership mutations run through SECURITY DEFINER RPCs that enforce
+// admin authorization, same-team scoping, and atomic profile updates server-side.
+// (Direct table writes are blocked by RLS — UI gating alone is not a security
+// boundary; the RPCs are the boundary. teamId params are kept for call-site
+// compatibility but the server resolves the caller's team authoritatively.)
+export async function inviteTeamMember(supabase: SupabaseClient, _teamId: string, email: string) {
+  const { error } = await supabase.rpc('invite_member_by_email', { p_email: email });
+  if (error) throw error;
 }
 
-export async function removeTeamMember(supabase: SupabaseClient, teamId: string, userId: string) {
-  const { error: deleteError } = await supabase
-    .from('team_members')
-    .delete()
-    .eq('team_id', teamId)
-    .eq('user_id', userId);
-
-  if (deleteError) throw deleteError;
-
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({ team_id: null })
-    .eq('id', userId);
-
-  if (updateError) throw updateError;
+export async function removeTeamMember(supabase: SupabaseClient, _teamId: string, userId: string) {
+  const { error } = await supabase.rpc('remove_team_member', { p_user_id: userId });
+  if (error) throw error;
 }
 
-export async function updateMemberRole(supabase: SupabaseClient, teamId: string, userId: string, role: string) {
-  const { error } = await supabase
-    .from('team_members')
-    .update({ role })
-    .eq('team_id', teamId)
-    .eq('user_id', userId);
-
+export async function updateMemberRole(supabase: SupabaseClient, _teamId: string, userId: string, role: string) {
+  const { error } = await supabase.rpc('set_member_role', { p_user_id: userId, p_role: role });
   if (error) throw error;
 }
 
@@ -698,6 +712,32 @@ export async function getRecentTeamNotes(supabase: SupabaseClient, teamId: strin
     .eq('notebooks.team_id', teamId)
     .order('updated_at', { ascending: false })
     .limit(limit);
+
+  if (error) throw error;
+
+  return (data || []).map((n: any) => ({
+    ...n,
+    owner_name: n.profiles?.name || 'Unknown',
+    last_edited_by_name: n.editor?.name || null,
+    categories: (n.note_categories || []).map((nc: any) => nc.categories).filter(Boolean),
+    profiles: undefined,
+    editor: undefined,
+    notebooks: undefined,
+    note_categories: undefined,
+  }));
+}
+
+/**
+ * All notes for the team, newest first. Used by the sidebar so its section
+ * derivations (recent / per-notebook / uncategorized) see the full dataset
+ * regardless of which page (notebook- or note-scoped) is mounted.
+ */
+export async function getAllTeamNotes(supabase: SupabaseClient, teamId: string): Promise<Note[]> {
+  const { data, error } = await supabase
+    .from('notes')
+    .select('*, profiles:owner_id(name), editor:last_edited_by(name), notebooks!inner(team_id), note_categories(categories(*))')
+    .eq('notebooks.team_id', teamId)
+    .order('updated_at', { ascending: false });
 
   if (error) throw error;
 

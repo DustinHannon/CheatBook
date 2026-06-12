@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useId } from 'react';
 import { FolderIcon } from '@heroicons/react/24/outline';
 
 interface Notebook {
@@ -20,6 +20,7 @@ const NotebookPickerDialog: React.FC<NotebookPickerDialogProps> = ({
   onSelect,
   notebooks,
 }) => {
+  const titleId = useId();
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -39,8 +40,13 @@ const NotebookPickerDialog: React.FC<NotebookPickerDialogProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-bg-overlay backdrop-blur-sm animate-dialog-fade-in" onClick={onClose} />
-      <div className="relative bg-bg-surface border border-border-default rounded-xl shadow-lg max-w-sm w-full mx-4 p-6 animate-dialog-scale-in">
-        <h3 className="text-display-sm font-display text-text-primary">Choose a notebook</h3>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative bg-bg-surface border border-border-default rounded-xl shadow-lg max-w-sm w-full mx-4 p-6 animate-dialog-scale-in"
+      >
+        <h3 id={titleId} className="text-display-sm font-display text-text-primary">Choose a notebook</h3>
         <p className="text-sm text-text-secondary mt-1">Where should the new note go?</p>
 
         <div className="mt-5 space-y-1 max-h-[300px] overflow-y-auto">

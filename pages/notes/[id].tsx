@@ -3,9 +3,9 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import NoteEditor from '../../components/NoteEditor';
-import ImagePaste from '../../components/ImagePaste';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../components/AuthContext';
+import { useToast } from '../../components/Toast';
 import { createClient } from '../../lib/supabase/client';
 import {
   getNotebooks,
@@ -19,6 +19,7 @@ const supabase = createClient();
 
 export default function NotePage() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
   const { id } = router.query;
 
@@ -89,31 +90,34 @@ export default function NotePage() {
       router.push('/');
     } catch (err) {
       console.error('Error deleting note:', err);
+      showToast('Failed to delete note.', 'error');
     }
   };
 
-  const handleCreateNote = async () => {
-    if (!selectedNotebookId || !user?.id) return;
+  const handleCreateNote = async (notebookId?: string) => {
+    // Prefer an explicit notebook (sidebar "Add note" under another notebook); else the open one.
+    const target = (typeof notebookId === 'string' ? notebookId : null) || selectedNotebookId;
+    if (!target || !user?.id) return;
     try {
       const { data: newNote, error } = await supabase
         .from('notes')
-        .insert({ title: 'Untitled', notebook_id: selectedNotebookId, owner_id: user.id, last_edited_by: user.id })
+        .insert({ title: 'Untitled', notebook_id: target, owner_id: user.id, last_edited_by: user.id })
         .select()
         .single();
       if (error) throw error;
       router.push(`/notes/${newNote.id}`);
     } catch (err) {
       console.error('Error creating note:', err);
+      showToast('Failed to create note.', 'error');
     }
   };
 
-  const handleImagePaste = async (file: File) => {
-    if (!note) return;
-    try {
-      await uploadNoteImage(supabase, note.id, file);
-    } catch (err) {
-      console.error('Error uploading image:', err);
-    }
+  // Upload an image and return its URL; wired into TinyMCE so the <img> is
+  // inserted at the caret and persisted via the editor's auto-save.
+  const handleImageUpload = async (file: File): Promise<string> => {
+    if (!note) throw new Error('Note not loaded');
+    const record = await uploadNoteImage(supabase, note.id, file);
+    return record.file_path;
   };
 
   const handleDuplicateNote = async () => {
@@ -128,6 +132,7 @@ export default function NotePage() {
       router.push(`/notes/${newNote.id}`);
     } catch (err) {
       console.error('Error duplicating note:', err);
+      showToast('Failed to duplicate note.', 'error');
     }
   };
 
@@ -151,14 +156,13 @@ export default function NotePage() {
             <span className="text-text-tertiary animate-pulse font-display text-xl">Loading...</span>
           </div>
         ) : note ? (
-          <ImagePaste onImagePaste={handleImagePaste} cursorPosition={0}>
-            <NoteEditor
-              note={note}
-              onSave={handleSaveNote}
-              onDelete={handleDeleteNote}
-              onDuplicate={handleDuplicateNote}
-            />
-          </ImagePaste>
+          <NoteEditor
+            note={note}
+            onSave={handleSaveNote}
+            onDelete={handleDeleteNote}
+            onDuplicate={handleDuplicateNote}
+            onImageUpload={handleImageUpload}
+          />
         ) : (
           <div className="flex-1 flex items-center justify-center h-full bg-bg-base">
             <div className="text-center">

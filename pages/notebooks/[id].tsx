@@ -56,12 +56,14 @@ export default function NotebookPage() {
     fetchNotes();
   }, [id]);
 
-  const handleCreateNote = async () => {
-    if (!id || typeof id !== 'string' || !user?.id) return;
+  const handleCreateNote = async (notebookId?: string) => {
+    // Prefer an explicit notebook (sidebar "Add note" under another notebook); else this page's.
+    const target = (typeof notebookId === 'string' ? notebookId : null) || (typeof id === 'string' ? id : null);
+    if (!target || !user?.id) return;
     try {
       const { data: newNote, error } = await supabase
         .from('notes')
-        .insert({ title: 'Untitled', notebook_id: id, owner_id: user.id, last_edited_by: user.id })
+        .insert({ title: 'Untitled', notebook_id: target, owner_id: user.id, last_edited_by: user.id })
         .select()
         .single();
       if (error) throw error;
@@ -97,7 +99,7 @@ export default function NotebookPage() {
                 )}
               </div>
               <button
-                onClick={handleCreateNote}
+                onClick={() => handleCreateNote()}
                 className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-4 py-2 text-sm transition"
               >
                 New Note
@@ -122,7 +124,7 @@ export default function NotebookPage() {
               <div className="text-center py-20">
                 <p className="text-text-secondary mb-4">No notes in this notebook yet.</p>
                 <button
-                  onClick={handleCreateNote}
+                  onClick={() => handleCreateNote()}
                   className="text-accent hover:text-accent-hover text-sm transition"
                 >
                   Create the first note

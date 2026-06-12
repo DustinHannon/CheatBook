@@ -80,7 +80,7 @@ const SearchPage: NextPage = () => {
   }, []);
 
   const handleResultClick = (note: Note) => {
-    router.push('/');
+    router.push(`/notes/${note.id}`);
   };
 
   const formatDate = (dateStr: string) => {
@@ -103,7 +103,13 @@ const SearchPage: NextPage = () => {
       <Head>
         <title>Search - CheatBook</title>
       </Head>
-      <Layout notebooks={notebooks}>
+      <Layout
+        notebooks={notebooks}
+        onSelectNotebook={(nbId) => router.push(`/notebooks/${nbId}`)}
+        onSelectNote={(noteId) => router.push(`/notes/${noteId}`)}
+        onCreateNote={(nbId) => router.push(nbId ? `/notebooks/${nbId}` : '/')}
+        onCreateNotebook={() => router.push('/')}
+      >
         <div className="bg-bg-base min-h-full">
           {/* Search input section */}
           <div className="pt-16 pb-8 px-6">

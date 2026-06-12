@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useId } from 'react';
 
 interface InputDialogProps {
   isOpen: boolean;
@@ -23,6 +23,7 @@ const InputDialog: React.FC<InputDialogProps> = ({
 }) => {
   const [value, setValue] = useState(defaultValue);
   const inputRef = useRef<HTMLInputElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
     if (isOpen) {
@@ -57,8 +58,13 @@ const InputDialog: React.FC<InputDialogProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-bg-overlay backdrop-blur-sm animate-dialog-fade-in" onClick={onClose} />
-      <div className="relative bg-bg-surface border border-border-default rounded-xl shadow-lg max-w-md w-full mx-4 p-6 animate-dialog-scale-in">
-        <h3 className="text-display-sm font-display text-text-primary">{title}</h3>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative bg-bg-surface border border-border-default rounded-xl shadow-lg max-w-md w-full mx-4 p-6 animate-dialog-scale-in"
+      >
+        <h3 id={titleId} className="text-display-sm font-display text-text-primary">{title}</h3>
 
         {error && (
           <div className="mt-4 bg-status-error/10 border border-status-error/20 text-status-error rounded-lg px-4 py-3 text-sm">

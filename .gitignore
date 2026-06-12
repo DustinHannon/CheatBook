@@ -11,3 +11,13 @@ out
 .env.test.local
 .env.production.local
 .vercel
+
+# QA agent — local credentials + generated run reports
+/.claude/qa-agent/credentials.local.json
+/qa-reports/
+
+# Scratch
+/.tmp/
+
+# Build cache
+tsconfig.tsbuildinfo

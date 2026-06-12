@@ -8,9 +8,12 @@ import {
 import UserPresence from './UserPresence';
 import { useRealtime, getUserColor } from './RealtimeContext';
 import { useAuth } from './AuthContext';
+import { useToast } from './Toast';
 import { createClient } from '../lib/supabase/client';
 import {
   updateNote as apiUpdateNote,
+  getNote,
+  NoteConflictError,
   pinNote,
   unpinNote,
   lockNote,
@@ -50,6 +53,8 @@ interface NoteEditorProps {
   onDelete?: (noteId: string) => void;
   onShare?: (noteId: string) => void;
   onDuplicate?: (noteId: string) => void;
+  /** Upload an image and return its URL (wired to TinyMCE paste/insert). */
+  onImageUpload?: (file: File) => Promise<string>;
   readOnly?: boolean;
 }
 
@@ -147,7 +152,7 @@ function relativeTime(dateStr: string): string {
   return `${Math.floor(hr / 24)}d ago`;
 }
 
-const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare, onDuplicate, readOnly = false }) => {
+const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare, onDuplicate, onImageUpload, readOnly = false }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [saveStatus, setSaveStatus] = useState<'unsaved' | 'saving' | 'saved' | 'error'>('saved');
@@ -163,6 +168,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
 
   const { user } = useAuth();
   const { joinNote, leaveNote } = useRealtime();
+  const { showToast } = useToast();
 
   const editorRef = useRef<any>(null);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -170,6 +176,20 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
   const isRemoteUpdate = useRef(false);
   const contentRef = useRef(content);
   contentRef.current = content;
+
+  // Latest-value refs so handlers registered once (realtime, timers) read fresh
+  // state without re-binding and without stale closures.
+  const titleRef = useRef(title);
+  titleRef.current = title;
+  const saveStatusRef = useRef(saveStatus);
+  saveStatusRef.current = saveStatus;
+  const docVersionRef = useRef(docVersion);
+  docVersionRef.current = docVersion;
+  const lastTypingSentRef = useRef(0);
+  const typingStopTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Assigned after handleSave is defined (placeholders avoid a TDZ cycle).
+  const handleSaveRef = useRef<() => void>(() => {});
+  const flushSaveRef = useRef<() => void>(() => {});
 
   const effectiveReadOnly = readOnly || (isLocked && !overrideLock);
 
@@ -196,10 +216,14 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
     channel.on('broadcast', { event: 'content-change' }, (payload: any) => {
       const data = payload.payload;
       if (data.userId === user.id) return;
+      // Ignore stale/older broadcasts.
+      if (typeof data.version === 'number' && data.version <= docVersionRef.current) return;
+      // Don't overwrite the local user's in-progress edits.
+      if (saveStatusRef.current === 'unsaved' || saveStatusRef.current === 'saving') return;
       isRemoteUpdate.current = true;
       setContent(data.content || '');
       if (data.title) setTitle(data.title);
-      setDocVersion(data.version || docVersion);
+      setDocVersion(typeof data.version === 'number' ? data.version : docVersionRef.current);
       setSaveStatus('saved');
       setLocalChanges(false);
       if (editorRef.current) editorRef.current.setContent(data.content || '');
@@ -241,66 +265,132 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id]);
 
-  // Auto-save (triggered when saveStatus changes to unsaved)
+  // Flush a pending save (and stop typing broadcasts) when leaving the note or
+  // unmounting, so edits made within the last debounce window aren't lost.
   useEffect(() => {
-    if (!note || effectiveReadOnly || saveStatus !== 'unsaved') return;
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    setLocalChanges(true);
-    saveTimerRef.current = setTimeout(() => { handleSave(); }, 2000);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saveStatus, title]);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+      flushSaveRef.current();
+    };
+  }, [note?.id]);
 
   const handleSave = async () => {
     if (!note || effectiveReadOnly) return;
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
     setSaveStatus('saving');
-    // Read latest content from TinyMCE editor instance
+    // Flush any in-flight image uploads so getContent() never serializes a blob: URL.
+    if (editorRef.current?.uploadImages) {
+      try { await editorRef.current.uploadImages(); } catch { /* fall through; save what we have */ }
+    }
+    // Read latest title/content at save time (avoids stale-closure saves).
     const currentContent = editorRef.current ? editorRef.current.getContent() : contentRef.current;
+    const currentTitle = titleRef.current;
     try {
-      const updated = await apiUpdateNote(supabase, note.id, { title, content: currentContent, version: docVersion + 1 });
+      // Optimistic concurrency: guard on the version we last read.
+      const updated = await apiUpdateNote(
+        supabase, note.id,
+        { title: currentTitle, content: currentContent },
+        docVersionRef.current,
+      );
       channelRef.current?.send({
         type: 'broadcast', event: 'content-change',
-        payload: { userId: user?.id, content: currentContent, title, version: updated.version },
+        payload: { userId: user?.id, content: currentContent, title: currentTitle, version: updated.version },
       });
-      if (onSave) onSave({ id: note.id, title, content: currentContent });
+      if (onSave) onSave({ id: note.id, title: currentTitle, content: currentContent });
       setSaveStatus('saved');
       setLocalChanges(false);
-      setDocVersion(updated.version || docVersion + 1);
+      setDocVersion(updated.version ?? docVersionRef.current + 1);
     } catch (err) {
+      if (err instanceof NoteConflictError) {
+        // Someone else saved first. Reload the latest; guard the programmatic
+        // setContent so it doesn't re-trigger onEditorChange → a spurious re-save.
+        try {
+          const fresh = await getNote(supabase, note.id);
+          const html = parseContent(fresh.content);
+          isRemoteUpdate.current = true;
+          setContent(html);
+          setTitle(fresh.title || '');
+          if (editorRef.current) editorRef.current.setContent(html);
+          setDocVersion(fresh.version || docVersionRef.current);
+          setSaveStatus('saved');
+          setLocalChanges(false);
+          setTimeout(() => { isRemoteUpdate.current = false; }, 100);
+        } catch {
+          setSaveStatus('error');
+        }
+        // Last-write-wins: the local user's unsaved edits were replaced — say so plainly.
+        showToast('Your unsaved changes were replaced by a newer version saved by someone else.', 'error');
+        return;
+      }
       console.error('Save error:', err);
       setSaveStatus('error');
+      showToast('Failed to save note.', 'error');
     }
   };
+  handleSaveRef.current = handleSave;
+  flushSaveRef.current = () => {
+    if (!note || effectiveReadOnly) return;
+    if (saveStatusRef.current !== 'unsaved') return;
+    handleSaveRef.current();
+  };
+
+  // (Re)arm the 2s autosave debounce on each change so it measures from the
+  // LAST keystroke, not the first.
+  const scheduleSave = useCallback(() => {
+    if (!note || effectiveReadOnly) return;
+    setSaveStatus('unsaved');
+    setLocalChanges(true);
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => { handleSaveRef.current(); }, 2000);
+  }, [note, effectiveReadOnly]);
+
+  // Throttle the "typing" broadcast (leading edge, max 1/1.5s) and send a
+  // trailing "stopped typing" so remote indicators clear.
+  const broadcastTyping = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTypingSentRef.current > 1500) {
+      lastTypingSentRef.current = now;
+      channelRef.current?.send({
+        type: 'broadcast', event: 'typing-status',
+        payload: { userId: user?.id, userName: user?.name, isTyping: true },
+      });
+    }
+    if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+    typingStopTimerRef.current = setTimeout(() => {
+      channelRef.current?.send({
+        type: 'broadcast', event: 'typing-status',
+        payload: { userId: user?.id, userName: user?.name, isTyping: false },
+      });
+    }, 2000);
+  }, [user?.id, user?.name]);
 
   const handleEditorChange = useCallback((newContent: string) => {
     if (isRemoteUpdate.current) return;
-    // Don't set React state for content — let TinyMCE manage it internally
-    // Just update the ref for saving and mark as unsaved
+    // TinyMCE manages content internally; just track it for saving.
     contentRef.current = newContent;
-    setSaveStatus('unsaved');
-    channelRef.current?.send({
-      type: 'broadcast', event: 'typing-status',
-      payload: { userId: user?.id, userName: user?.name, isTyping: true },
-    });
-  }, [user?.id, user?.name]);
+    scheduleSave();
+    broadcastTyping();
+  }, [scheduleSave, broadcastTyping]);
 
   const handleTogglePin = async () => {
     if (!note) return;
     try { isPinned ? await unpinNote(supabase, note.id) : await pinNote(supabase, note.id); setIsPinned(!isPinned); }
-    catch (err) { console.error(err); }
+    catch (err) { console.error(err); showToast('Failed to update pin.', 'error'); }
     setShowMenu(false);
   };
 
   const handleToggleLock = async () => {
     if (!note) return;
     try { isLocked ? await unlockNote(supabase, note.id) : await lockNote(supabase, note.id); setIsLocked(!isLocked); setOverrideLock(false); }
-    catch (err) { console.error(err); }
+    catch (err) { console.error(err); showToast('Failed to update lock.', 'error'); }
     setShowMenu(false);
   };
 
   const handleHide = async () => {
     if (!note) return;
-    try { await hideNote(supabase, note.id); } catch (err) { console.error(err); }
+    try { await hideNote(supabase, note.id); showToast('Note hidden.', 'success'); }
+    catch (err) { console.error(err); showToast('Failed to hide note.', 'error'); }
     setShowMenu(false);
   };
 
@@ -388,7 +478,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
           <input
             type="text"
             value={title}
-            onChange={(e) => { setTitle(e.target.value); setSaveStatus('unsaved'); }}
+            onChange={(e) => { setTitle(e.target.value); scheduleSave(); }}
             placeholder="Untitled"
             className="w-full text-display-md bg-transparent border-none outline-none placeholder:text-text-tertiary mb-6"
             readOnly={effectiveReadOnly}
@@ -418,11 +508,28 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
               resize: false,
               toolbar_mode: 'wrap',
               link_default_target: '_blank',
+              // Upload pasted/inserted images through the app's storage helper and
+              // replace the <img src> with the returned URL (persists via auto-save).
+              automatic_uploads: true,
+              paste_data_images: true,
+              images_upload_handler: (blobInfo: { blob: () => Blob; filename: () => string }) =>
+                new Promise<string>((resolve, reject) => {
+                  if (!onImageUpload) { reject('Image upload is not available.'); return; }
+                  const blob = blobInfo.blob();
+                  const file = new File([blob], blobInfo.filename(), { type: blob.type });
+                  onImageUpload(file)
+                    .then(resolve)
+                    .catch((e: unknown) => {
+                      console.error('Image upload failed:', e);
+                      showToast(e instanceof Error ? e.message : 'Image upload failed.', 'error');
+                      reject('Image upload failed.');
+                    });
+                }),
               setup: (editor) => {
                 editor.on('keydown', (e) => {
                   if ((e.metaKey || e.ctrlKey) && e.key === 's') {
                     e.preventDefault();
-                    handleSave();
+                    handleSaveRef.current();
                   }
                 });
               },

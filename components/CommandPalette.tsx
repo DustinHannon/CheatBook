@@ -28,6 +28,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestIdRef = useRef(0);
 
   // Focus input when opened
   useEffect(() => {
@@ -49,19 +50,23 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose }) => {
       return;
     }
 
+    // Monotonic token so a slow earlier request can't overwrite newer results.
+    const requestId = ++requestIdRef.current;
     setIsLoading(true);
     try {
       const supabase = createClient();
       const data = await searchNotes(supabase, searchQuery.trim());
+      if (requestId !== requestIdRef.current) return;
       setResults(data as SearchResult[]);
       setHasSearched(true);
       setSelectedIndex(0);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Search failed:', err);
       setResults([]);
       setHasSearched(true);
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) setIsLoading(false);
     }
   }, []);
 
