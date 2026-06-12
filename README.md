@@ -28,10 +28,11 @@ An IT team notes app for quickly saving and sharing the things you need to remem
 - **Typing indicators** — See when teammates are typing
 
 ### Notes & Editor
-- **TinyMCE rich text editor** — Bold, italic, underline, strikethrough, headings, lists, blockquote, links, images, tables, horizontal rules
+- **TinyMCE rich text editor** — Bold, italic, underline, strikethrough, headings, lists, blockquote, links, images, tables, horizontal rules, clear formatting
 - **Code blocks** — Insert code samples with language selection (codesample plugin)
+- **Paste images** — Paste an image from the clipboard directly into a note
 - **Note locking** — Lock important notes to prevent accidental edits (confirmation to override)
-- **Note pinning** — Pin important notes to dashboard
+- **Note pinning** — Pin notes; pinned notes show a pin marker on their note cards
 - **Note hiding** — Hide notes per-user without deleting for the team
 - **Note metadata** — See who created a note and who last edited it
 - **Auto-save** — Changes save automatically every 2 seconds
@@ -39,11 +40,11 @@ An IT team notes app for quickly saving and sharing the things you need to remem
 - **Backward compatible** — Old Draft.js JSON content auto-converts to HTML
 
 ### Dashboard & Navigation
-- **Sidebar** — Always visible, shows notebooks and notes for quick navigation
+- **Sidebar** — Notebook and note navigation; always visible on desktop, off-canvas (hamburger toggle) on mobile
 - **Dashboard** — Greeting, recent notes grid, activity feed
 - **Command palette** — Cmd+K / Ctrl+K for quick note search
-- **Quick-create** — One click to create a note (picks notebook automatically or shows picker)
-- **Notebook cards** — Visible on dashboard when no notes exist yet
+- **Quick-create** — One click to create a note: auto-creates in your notebook when you have exactly one, shows a picker when you have several, or prompts you to create a notebook first when you have none
+- **Empty state** — With no notes yet, the dashboard prompts you to create your first notebook or note
 
 ### Settings & Admin
 - **Profile** — Name, avatar upload, email (read-only)
@@ -119,4 +120,6 @@ All RLS policies use `profiles.team_id` for team membership checks — no cross-
 
 ## License
 
-ISC
+GPL-3.0 — see [LICENSE](LICENSE). Copyright (C) 2026 Dustin Hannon.
+
+(The project uses self-hosted TinyMCE under its GPL license, so the app is GPL-licensed accordingly.)

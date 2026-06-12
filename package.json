@@ -2,6 +2,7 @@
   "name": "cheatbook",
   "version": "1.0.0",
   "private": true,
+  "license": "GPL-3.0-only",
   "engines": {
     "node": ">=22.0.0"
   },
