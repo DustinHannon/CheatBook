@@ -358,10 +358,13 @@ const ProfilePage: NextPage = () => {
                               await inviteMember(inviteEmail.trim());
                               setInviteEmail('');
                               setInviteStatus('Invited!');
+                              showToast('Member invited.', 'success');
                               setTimeout(() => setInviteStatus(''), 3000);
                             } catch (err: any) {
-                              setInviteStatus(err?.message || 'Failed');
-                              setTimeout(() => setInviteStatus(''), 3000);
+                              const msg = err?.message || 'Failed to invite member.';
+                              setInviteStatus(msg);
+                              showToast(msg, 'error');
+                              setTimeout(() => setInviteStatus(''), 5000);
                             }
                           }}
                           className="bg-accent hover:bg-accent-hover text-bg-base font-semibold rounded-lg px-4 py-2 text-sm transition"

@@ -1,0 +1,57 @@
+- generic [ref=e1]:
+  - generic [ref=e14]:
+    - navigation [ref=e15]:
+      - link "CheatBook" [ref=e17] [cursor=pointer]:
+        - /url: /
+        - img [ref=e18]
+        - generic [ref=e20]: CheatBook
+      - button "Search notes... Ctrl+K" [ref=e22] [cursor=pointer]:
+        - img [ref=e23]
+        - generic [ref=e25]: Search notes...
+        - generic [ref=e26]: Ctrl+K
+      - button "User menu" [ref=e29] [cursor=pointer]: Q
+    - generic [ref=e30]:
+      - complementary [ref=e31]:
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - generic [ref=e34]: LIBRARY
+            - generic [ref=e35]:
+              - button "New note" [ref=e36] [cursor=pointer]:
+                - img [ref=e37]
+              - button "New notebook" [ref=e39] [cursor=pointer]:
+                - img [ref=e40]
+          - separator [ref=e42]
+          - generic [ref=e43]:
+            - button "Recent Notes" [ref=e44] [cursor=pointer]:
+              - img [ref=e45]
+              - generic [ref=e47]: Recent Notes
+            - button "QA-2026-06-11_222132 Editor Test 5m ago" [ref=e49] [cursor=pointer]:
+              - paragraph [ref=e50]: QA-2026-06-11_222132 Editor Test
+              - paragraph [ref=e51]: 5m ago
+          - generic [ref=e52]:
+            - button "Notebooks" [ref=e53] [cursor=pointer]:
+              - img [ref=e54]
+              - generic [ref=e56]: Notebooks
+            - generic [ref=e58]:
+              - button "QA-2026-06-11_222132 Sandbox 1" [ref=e59] [cursor=pointer]:
+                - img [ref=e60]
+                - img [ref=e62]
+                - generic [ref=e64]: QA-2026-06-11_222132 Sandbox
+                - generic [ref=e65]: "1"
+              - generic:
+                - button "QA-2026-06-11_222132 Editor Test 5m ago" [ref=e66] [cursor=pointer]:
+                  - paragraph [ref=e67]: QA-2026-06-11_222132 Editor Test
+                  - paragraph [ref=e68]: 5m ago
+                - button "Add note" [ref=e69] [cursor=pointer]:
+                  - img [ref=e70]
+                  - generic [ref=e72]: Add note
+          - generic [ref=e73]:
+            - button "Uncategorized" [ref=e74] [cursor=pointer]:
+              - img [ref=e75]
+              - generic [ref=e77]: Uncategorized
+            - paragraph [ref=e79]: No uncategorized notes
+      - main [ref=e6]:
+        - generic [ref=e7]:
+          - textbox "Search your notes..." [active] [ref=e10]: a, b (c) "d" %e_
+          - paragraph [ref=e80]: No results found
+  - alert [ref=e5]

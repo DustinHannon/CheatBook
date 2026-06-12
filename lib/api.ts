@@ -117,6 +117,16 @@ async function getUserTeamId(supabase: SupabaseClient): Promise<string | null> {
   return data?.team_id ?? null;
 }
 
+// Per-user hidden notes are filtered out of every list view. Defensive: a failed
+// lookup must not break the list (just shows everything).
+async function getHiddenNoteIdSet(supabase: SupabaseClient): Promise<Set<string>> {
+  try {
+    return new Set(await getHiddenNoteIds(supabase));
+  } catch {
+    return new Set();
+  }
+}
+
 // ─── Notebooks ───────────────────────────────────────────────────────
 export async function getNotebooks(supabase: SupabaseClient) {
   const teamId = await getUserTeamId(supabase);
@@ -187,7 +197,8 @@ export async function getNotesForNotebook(supabase: SupabaseClient, notebookId: 
 
   if (error) throw error;
 
-  return (data || []).map((n: any) => ({
+  const hidden = await getHiddenNoteIdSet(supabase);
+  return (data || []).filter((n: any) => !hidden.has(n.id)).map((n: any) => ({
     ...n,
     owner_name: n.profiles?.name || 'Unknown',
     last_edited_by_name: n.editor?.name || null,
@@ -304,7 +315,8 @@ export async function searchNotes(supabase: SupabaseClient, query: string) {
 
   if (error) throw error;
 
-  return (data || []).map((n: any) => ({
+  const hidden = await getHiddenNoteIdSet(supabase);
+  return (data || []).filter((n: any) => !hidden.has(n.id)).map((n: any) => ({
     ...n,
     owner_name: n.profiles?.name || 'Unknown',
     categories: (n.note_categories || []).map((nc: any) => nc.categories).filter(Boolean),
@@ -693,7 +705,8 @@ export async function getPinnedNotes(supabase: SupabaseClient, teamId: string): 
 
   if (error) throw error;
 
-  return (data || []).map((n: any) => ({
+  const hidden = await getHiddenNoteIdSet(supabase);
+  return (data || []).filter((n: any) => !hidden.has(n.id)).map((n: any) => ({
     ...n,
     owner_name: n.profiles?.name || 'Unknown',
     last_edited_by_name: n.editor?.name || null,
@@ -715,7 +728,8 @@ export async function getRecentTeamNotes(supabase: SupabaseClient, teamId: strin
 
   if (error) throw error;
 
-  return (data || []).map((n: any) => ({
+  const hidden = await getHiddenNoteIdSet(supabase);
+  return (data || []).filter((n: any) => !hidden.has(n.id)).map((n: any) => ({
     ...n,
     owner_name: n.profiles?.name || 'Unknown',
     last_edited_by_name: n.editor?.name || null,
@@ -741,7 +755,8 @@ export async function getAllTeamNotes(supabase: SupabaseClient, teamId: string):
 
   if (error) throw error;
 
-  return (data || []).map((n: any) => ({
+  const hidden = await getHiddenNoteIdSet(supabase);
+  return (data || []).filter((n: any) => !hidden.has(n.id)).map((n: any) => ({
     ...n,
     owner_name: n.profiles?.name || 'Unknown',
     last_edited_by_name: n.editor?.name || null,

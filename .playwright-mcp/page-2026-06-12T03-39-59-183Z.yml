@@ -1,0 +1,98 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - navigation [ref=e4]:
+      - link "CheatBook" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img [ref=e7]
+        - generic [ref=e9]: CheatBook
+      - button "Search notes... Ctrl+K" [ref=e11] [cursor=pointer]:
+        - img [ref=e12]
+        - generic [ref=e14]: Search notes...
+        - generic [ref=e15]: Ctrl+K
+      - button "User menu" [ref=e18] [cursor=pointer]: Q
+    - generic [ref=e19]:
+      - complementary [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - generic [ref=e23]: LIBRARY
+            - generic [ref=e24]:
+              - button "New note" [ref=e25] [cursor=pointer]:
+                - img [ref=e26]
+              - button "New notebook" [ref=e28] [cursor=pointer]:
+                - img [ref=e29]
+          - separator [ref=e31]
+          - generic [ref=e32]:
+            - button "Recent Notes" [ref=e33] [cursor=pointer]:
+              - img [ref=e34]
+              - generic [ref=e36]: Recent Notes
+            - generic [ref=e68]:
+              - button "QA-2026-06-11_222132 Editor Test (Copy) 1m ago" [ref=e69] [cursor=pointer]:
+                - paragraph [ref=e70]: QA-2026-06-11_222132 Editor Test (Copy)
+                - paragraph [ref=e71]: 1m ago
+              - button "QA-2026-06-11_222132 Editor Test 3m ago" [ref=e72] [cursor=pointer]:
+                - paragraph [ref=e73]: QA-2026-06-11_222132 Editor Test
+                - paragraph [ref=e74]: 3m ago
+          - generic [ref=e37]:
+            - button "Notebooks" [ref=e38] [cursor=pointer]:
+              - img [ref=e39]
+              - generic [ref=e41]: Notebooks
+            - generic [ref=e76]:
+              - button "QA-2026-06-11_222132 Sandbox 2" [ref=e77] [cursor=pointer]:
+                - img [ref=e78]
+                - img [ref=e80]
+                - generic [ref=e82]: QA-2026-06-11_222132 Sandbox
+                - generic [ref=e83]: "2"
+              - generic:
+                - button "QA-2026-06-11_222132 Editor Test (Copy) 1m ago" [ref=e84] [cursor=pointer]:
+                  - paragraph [ref=e85]: QA-2026-06-11_222132 Editor Test (Copy)
+                  - paragraph [ref=e86]: 1m ago
+                - button "QA-2026-06-11_222132 Editor Test 3m ago" [ref=e87] [cursor=pointer]:
+                  - paragraph [ref=e88]: QA-2026-06-11_222132 Editor Test
+                  - paragraph [ref=e89]: 3m ago
+                - button "Add note" [ref=e90] [cursor=pointer]:
+                  - img [ref=e91]
+                  - generic [ref=e93]: Add note
+          - generic [ref=e42]:
+            - button "Uncategorized" [ref=e43] [cursor=pointer]:
+              - img [ref=e44]
+              - generic [ref=e46]: Uncategorized
+            - paragraph [ref=e48]: No uncategorized notes
+      - main [ref=e49]:
+        - generic [ref=e51]:
+          - generic [ref=e52]:
+            - generic [ref=e53]:
+              - heading "Good evening, QA Bot 222132" [level=1] [ref=e54]
+              - paragraph [ref=e94]: QA-2026-06-11_222132 Team
+            - button "New Note" [ref=e55] [cursor=pointer]:
+              - img [ref=e56]
+              - text: New Note
+          - generic [ref=e97]:
+            - text: PINNED
+            - generic [ref=e100] [cursor=pointer]:
+              - generic [ref=e101]:
+                - heading "QA-2026-06-11_222132 Editor Test" [level=3] [ref=e102]
+                - img [ref=e103]
+              - paragraph [ref=e105]: The quick brown fox jumps over the lazy dog. Paragraph one for autosave and cursor testing. NAVFLUSHCHECK FORMATTEST bol...
+              - generic [ref=e106]:
+                - generic [ref=e107]: by QA Bot 222132
+                - generic [ref=e108]: 3m ago
+          - generic [ref=e59]:
+            - text: RECENT NOTES
+            - generic [ref=e60]:
+              - generic [ref=e109] [cursor=pointer]:
+                - generic [ref=e110]:
+                  - heading "QA-2026-06-11_222132 Editor Test (Copy)" [level=3] [ref=e111]
+                  - img [ref=e112]
+                - paragraph [ref=e114]: The quick brown fox jumps over the lazy dog. Paragraph one for autosave and cursor testing. NAVFLUSHCHECK FORMATTEST bol...
+                - generic [ref=e115]:
+                  - generic [ref=e116]: by QA Bot 222132
+                  - generic [ref=e117]: 1m ago
+              - generic [ref=e118] [cursor=pointer]:
+                - generic [ref=e119]:
+                  - heading "QA-2026-06-11_222132 Editor Test" [level=3] [ref=e120]
+                  - img [ref=e121]
+                - paragraph [ref=e123]: The quick brown fox jumps over the lazy dog. Paragraph one for autosave and cursor testing. NAVFLUSHCHECK FORMATTEST bol...
+                - generic [ref=e124]:
+                  - generic [ref=e125]: by QA Bot 222132
+                  - generic [ref=e126]: 3m ago
+  - alert [ref=e67]

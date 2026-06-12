@@ -6,6 +6,7 @@ import {
   LockClosedIcon,
 } from '@heroicons/react/24/outline';
 import UserPresence from './UserPresence';
+import ConfirmDialog from './ConfirmDialog';
 import { useRealtime, getUserColor } from './RealtimeContext';
 import { useAuth } from './AuthContext';
 import { useToast } from './Toast';
@@ -165,6 +166,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
   const [isPinned, setIsPinned] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [overrideLock, setOverrideLock] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { user } = useAuth();
   const { joinNote, leaveNote } = useRealtime();
@@ -187,6 +189,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
   docVersionRef.current = docVersion;
   const lastTypingSentRef = useRef(0);
   const typingStopTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isSavingRef = useRef(false);
   // Assigned after handleSave is defined (placeholders avoid a TDZ cycle).
   const handleSaveRef = useRef<() => void>(() => {});
   const flushSaveRef = useRef<() => void>(() => {});
@@ -276,17 +279,20 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
   }, [note?.id]);
 
   const handleSave = async () => {
-    if (!note || effectiveReadOnly) return;
+    // Skip overlapping saves: a second save with a stale version would 406-conflict
+    // against the first save's own write (spurious self-conflict).
+    if (!note || effectiveReadOnly || isSavingRef.current) return;
+    isSavingRef.current = true;
     if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
     setSaveStatus('saving');
-    // Flush any in-flight image uploads so getContent() never serializes a blob: URL.
-    if (editorRef.current?.uploadImages) {
-      try { await editorRef.current.uploadImages(); } catch { /* fall through; save what we have */ }
-    }
-    // Read latest title/content at save time (avoids stale-closure saves).
-    const currentContent = editorRef.current ? editorRef.current.getContent() : contentRef.current;
-    const currentTitle = titleRef.current;
     try {
+      // Flush any in-flight image uploads so getContent() never serializes a blob: URL.
+      if (editorRef.current?.uploadImages) {
+        try { await editorRef.current.uploadImages(); } catch { /* fall through; save what we have */ }
+      }
+      // Read latest title/content at save time (avoids stale-closure saves).
+      const currentContent = editorRef.current ? editorRef.current.getContent() : contentRef.current;
+      const currentTitle = titleRef.current;
       // Optimistic concurrency: guard on the version we last read.
       const updated = await apiUpdateNote(
         supabase, note.id,
@@ -326,6 +332,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
       console.error('Save error:', err);
       setSaveStatus('error');
       showToast('Failed to save note.', 'error');
+    } finally {
+      isSavingRef.current = false;
     }
   };
   handleSaveRef.current = handleSave;
@@ -438,7 +446,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
           {activeUsers.map(u => <UserPresence key={u.id} user={u} size="small" />)}
           {note && (
             <div className="relative">
-              <button onClick={() => setShowMenu(!showMenu)} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-surface-hover transition-colors">
+              <button aria-label="Note actions" onClick={() => setShowMenu(!showMenu)} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-surface-hover transition-colors">
                 <EllipsisHorizontalIcon className="w-5 h-5" />
               </button>
               {showMenu && (
@@ -451,7 +459,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
                     <button onClick={handleToggleLock} className="w-full text-left px-4 py-2 text-sm text-text-body hover:bg-bg-surface-hover">{isLocked ? 'Unlock note' : 'Lock note'}</button>
                     <button onClick={handleHide} className="w-full text-left px-4 py-2 text-sm text-text-body hover:bg-bg-surface-hover">Hide note</button>
                     {onDelete && (
-                      <><div className="my-1 border-t border-border-subtle" /><button onClick={() => { onDelete(note.id); setShowMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-status-error hover:bg-bg-surface-hover">Delete</button></>
+                      <><div className="my-1 border-t border-border-subtle" /><button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true); }} className="w-full text-left px-4 py-2 text-sm text-status-error hover:bg-bg-surface-hover">Delete</button></>
                     )}
                   </div>
                 </>
@@ -482,6 +490,15 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
             placeholder="Untitled"
             className="w-full text-display-md bg-transparent border-none outline-none placeholder:text-text-tertiary mb-6"
             readOnly={effectiveReadOnly}
+          />
+          <ConfirmDialog
+            isOpen={showDeleteConfirm}
+            onClose={() => setShowDeleteConfirm(false)}
+            onConfirm={() => { if (note && onDelete) onDelete(note.id); }}
+            title="Delete note"
+            message="Delete this note for the whole team? This can't be undone."
+            confirmLabel="Delete"
+            confirmVariant="danger"
           />
           <Editor
             licenseKey="gpl"

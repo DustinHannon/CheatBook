@@ -1,0 +1,163 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - navigation [ref=e4]:
+      - link "CheatBook" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img [ref=e7]
+        - generic [ref=e9]: CheatBook
+      - button "Search notes... Ctrl+K" [ref=e11] [cursor=pointer]:
+        - img [ref=e12]
+        - generic [ref=e14]: Search notes...
+        - generic [ref=e15]: Ctrl+K
+      - button "User menu" [ref=e18] [cursor=pointer]: Q
+    - generic [ref=e19]:
+      - complementary [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - generic [ref=e23]: LIBRARY
+            - generic [ref=e24]:
+              - button "New note" [ref=e25] [cursor=pointer]:
+                - img [ref=e26]
+              - button "New notebook" [ref=e28] [cursor=pointer]:
+                - img [ref=e29]
+          - separator [ref=e31]
+          - generic [ref=e32]:
+            - button "Recent Notes" [ref=e33] [cursor=pointer]:
+              - img [ref=e34]
+              - generic [ref=e36]: Recent Notes
+            - generic [ref=e53]:
+              - button "QA-2026-06-11_222132 Editor Test (Copy) Just now" [ref=e132] [cursor=pointer]:
+                - paragraph [ref=e133]: QA-2026-06-11_222132 Editor Test (Copy)
+                - paragraph [ref=e134]: Just now
+              - button "QA-2026-06-11_222132 Editor Test 1m ago" [ref=e135] [cursor=pointer]:
+                - paragraph [ref=e55]: QA-2026-06-11_222132 Editor Test
+                - paragraph [ref=e56]: 1m ago
+          - generic [ref=e37]:
+            - button "Notebooks" [ref=e38] [cursor=pointer]:
+              - img [ref=e39]
+              - generic [ref=e41]: Notebooks
+            - generic [ref=e58]:
+              - button "QA-2026-06-11_222132 Sandbox 1" [ref=e59] [cursor=pointer]:
+                - img [ref=e60]
+                - img [ref=e62]
+                - generic [ref=e64]: QA-2026-06-11_222132 Sandbox
+                - generic [ref=e65]: "1"
+              - generic:
+                - button "QA-2026-06-11_222132 Editor Test (Copy) Just now" [ref=e136] [cursor=pointer]:
+                  - paragraph [ref=e137]: QA-2026-06-11_222132 Editor Test (Copy)
+                  - paragraph [ref=e138]: Just now
+                - button "QA-2026-06-11_222132 Editor Test 1m ago" [ref=e139] [cursor=pointer]:
+                  - paragraph [ref=e67]: QA-2026-06-11_222132 Editor Test
+                  - paragraph [ref=e68]: 1m ago
+                - button "Add note" [ref=e69] [cursor=pointer]:
+                  - img [ref=e70]
+                  - generic [ref=e72]: Add note
+          - generic [ref=e42]:
+            - button "Uncategorized" [ref=e43] [cursor=pointer]:
+              - img [ref=e44]
+              - generic [ref=e46]: Uncategorized
+            - paragraph [ref=e48]: No uncategorized notes
+      - main [ref=e49]:
+        - generic [ref=e73]:
+          - generic [ref=e74]:
+            - generic [ref=e75]:
+              - generic [ref=e78]:
+                - img [ref=e79]
+                - text: Saved
+              - generic [ref=e81]: Created by QA Bot 222132 · Edited by QA Bot 222132 just now
+            - button [ref=e84] [cursor=pointer]:
+              - img [ref=e85]
+          - generic [ref=e96]:
+            - textbox "Untitled" [ref=e97]: QA-2026-06-11_222132 Editor Test (Copy)
+            - application [ref=e98]:
+              - generic [ref=e99]:
+                - group [ref=e101]:
+                  - toolbar [ref=e102]:
+                    - button "Bold" [ref=e103]:
+                      - generic:
+                        - img
+                    - button "Italic" [ref=e104]:
+                      - generic:
+                        - img
+                    - button "Underline" [ref=e105]:
+                      - generic:
+                        - img
+                    - button "Strikethrough" [ref=e106]:
+                      - generic:
+                        - img
+                  - toolbar [ref=e107]:
+                    - button "Block Paragraph" [ref=e108]:
+                      - generic [ref=e109]: Paragraph
+                      - img [ref=e111]
+                  - toolbar [ref=e113]:
+                    - button "Bullet list" [ref=e114]:
+                      - generic:
+                        - img
+                    - button "Numbered list" [ref=e115]:
+                      - generic:
+                        - img
+                  - toolbar [ref=e116]:
+                    - button "Blockquote" [ref=e117]:
+                      - generic:
+                        - img
+                    - button "Insert/edit code sample" [ref=e118]:
+                      - generic:
+                        - img
+                  - toolbar [ref=e119]:
+                    - button "Insert/edit link" [ref=e120]:
+                      - generic:
+                        - img
+                    - button "Insert/edit image" [ref=e121]:
+                      - generic:
+                        - img
+                    - button "Table" [ref=e122]:
+                      - generic:
+                        - img
+                      - img [ref=e124]
+                  - toolbar [ref=e126]:
+                    - button "Horizontal line" [ref=e127]:
+                      - generic:
+                        - img
+                    - button "Clear formatting" [ref=e128]:
+                      - generic:
+                        - img
+                - iframe [ref=e131]:
+                  - generic "Rich Text Area" [active] [ref=f6e1]:
+                    - paragraph [ref=f6e30]: The quick brown fox jumps over the lazy dog. Paragraph one for autosave and cursor testing. NAVFLUSHCHECK
+                    - paragraph [ref=f6e31]:
+                      - text: FORMATTEST
+                      - strong [ref=f6e32]: bold
+                      - emphasis [ref=f6e33]: italic
+                      - text: underline strike
+                    - list [ref=f6e34]:
+                      - listitem [ref=f6e35]:
+                        - text: Heading Two
+                        - list [ref=f6e36]:
+                          - listitem [ref=f6e37]: bullet a
+                          - listitem [ref=f6e38]:
+                            - text: bullet b
+                            - list [ref=f6e39]:
+                              - listitem [ref=f6e40]: num 1
+                              - listitem [ref=f6e41]:
+                                - text: num 2
+                                - blockquote [ref=f6e42]:
+                                  - text: a quote
+                                  - paragraph [ref=f6e43]:
+                                    - link "a link" [ref=f6e44]:
+                                      - /url: https://example.com
+                                  - separator [ref=f6e45]
+                                  - table [ref=f6e46]:
+                                    - rowgroup [ref=f6e47]:
+                                      - row "c1 c2" [ref=f6e48]:
+                                        - cell "c1" [ref=f6e49]
+                                        - cell "c2" [ref=f6e50]
+                                  - generic [ref=f6e51]: const answer = 42; console.log(answer);
+                    - paragraph [ref=f6e52]:
+                      - text: XSSTEST
+                      - img [ref=f6e56]
+                    - paragraph [ref=f6e53]: SCRIPTTEST done
+                    - paragraph [ref=f6e54]:
+                      - text: RAWXSS
+                      - img [ref=f6e57]
+                      - img [ref=f6e55]
+  - alert [ref=e52]: QA-2026-06-11_222132 Editor Test - CheatBook

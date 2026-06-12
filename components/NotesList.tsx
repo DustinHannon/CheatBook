@@ -119,6 +119,7 @@ const NotesList: React.FC<NotesListProps> = ({
             onClick={() => onCreateNote()}
             className="p-1.5 rounded-md text-text-tertiary hover:text-accent hover:bg-bg-surface-hover focus:outline-none"
             title="New note"
+            aria-label="New note"
           >
             <DocumentPlusIcon className="h-4 w-4" />
           </button>
@@ -126,6 +127,7 @@ const NotesList: React.FC<NotesListProps> = ({
             onClick={onCreateNotebook}
             className="p-1.5 rounded-md text-text-tertiary hover:text-accent hover:bg-bg-surface-hover focus:outline-none"
             title="New notebook"
+            aria-label="New notebook"
           >
             <FolderPlusIcon className="h-4 w-4" />
           </button>
@@ -249,11 +251,12 @@ const NotesList: React.FC<NotesListProps> = ({
 
                 {/* Add note button inside notebook */}
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     onCreateNote(notebook.id);
                   }}
-                  className="w-full text-left px-5 pl-12 py-2 hover:bg-bg-surface-hover flex items-center gap-1.5 text-text-tertiary hover:text-accent transition-colors"
+                  className="relative z-10 w-full text-left px-5 pl-12 py-2 hover:bg-bg-surface-hover flex items-center gap-1.5 text-text-tertiary hover:text-accent transition-colors"
                 >
                   <PlusIcon className="h-3.5 w-3.5" />
                   <span className="text-xs">Add note</span>

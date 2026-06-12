@@ -1,0 +1,14 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - heading "CheatBook" [level=1] [ref=e6]
+      - paragraph [ref=e8]: Quick notes for the things you need to remember
+    - generic [ref=e10]:
+      - img [ref=e33]
+      - heading "Check your email" [level=2] [ref=e35]
+      - paragraph [ref=e36]:
+        - text: We sent a confirmation link to
+        - text: qa-2026-06-11-222132@qabot.dev
+      - paragraph [ref=e37]: Click the link in the email to activate your account, then come back here to sign in.
+      - button "Back to sign in" [ref=e38] [cursor=pointer]
+  - alert [ref=e25]

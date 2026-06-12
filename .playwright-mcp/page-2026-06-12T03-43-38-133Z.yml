@@ -1,0 +1,110 @@
+- generic [ref=e1]:
+  - generic [ref=e63]:
+    - navigation [ref=e64]:
+      - link "CheatBook" [ref=e66] [cursor=pointer]:
+        - /url: /
+        - img [ref=e67]
+        - generic [ref=e69]: CheatBook
+      - button "Search notes... Ctrl+K" [ref=e71] [cursor=pointer]:
+        - img [ref=e72]
+        - generic [ref=e74]: Search notes...
+        - generic [ref=e75]: Ctrl+K
+      - button "User menu" [ref=e78] [cursor=pointer]: Q
+    - generic [ref=e79]:
+      - complementary [ref=e80]:
+        - generic [ref=e81]:
+          - generic [ref=e82]:
+            - generic [ref=e83]: LIBRARY
+            - generic [ref=e84]:
+              - button "New note" [ref=e85] [cursor=pointer]:
+                - img [ref=e86]
+              - button "New notebook" [ref=e88] [cursor=pointer]:
+                - img [ref=e89]
+          - separator [ref=e91]
+          - generic [ref=e92]:
+            - button "Recent Notes" [ref=e93] [cursor=pointer]:
+              - img [ref=e94]
+              - generic [ref=e96]: Recent Notes
+            - button "QA-2026-06-11_222132 Editor Test 7m ago" [ref=e130] [cursor=pointer]:
+              - paragraph [ref=e99]: QA-2026-06-11_222132 Editor Test
+              - paragraph [ref=e100]: 7m ago
+          - generic [ref=e101]:
+            - button "Notebooks" [ref=e102] [cursor=pointer]:
+              - img [ref=e103]
+              - generic [ref=e105]: Notebooks
+            - generic [ref=e107]:
+              - button "QA-2026-06-11_222132 Sandbox 1" [ref=e108] [cursor=pointer]:
+                - img [ref=e109]
+                - img [ref=e111]
+                - generic [ref=e113]: QA-2026-06-11_222132 Sandbox
+                - generic [ref=e114]: "1"
+              - generic:
+                - button "QA-2026-06-11_222132 Editor Test 7m ago" [ref=e131] [cursor=pointer]:
+                  - paragraph [ref=e116]: QA-2026-06-11_222132 Editor Test
+                  - paragraph [ref=e117]: 7m ago
+                - button "Add note" [ref=e118] [cursor=pointer]:
+                  - img [ref=e119]
+                  - generic [ref=e121]: Add note
+          - generic [ref=e122]:
+            - button "Uncategorized" [ref=e123] [cursor=pointer]:
+              - img [ref=e124]
+              - generic [ref=e126]: Uncategorized
+            - paragraph [ref=e128]: No uncategorized notes
+      - main [ref=e6]:
+        - generic [ref=e8]:
+          - heading "Settings" [level=1] [ref=e9]
+          - generic [ref=e11]:
+            - generic [ref=e13]: Q
+            - button "Change avatar" [ref=e14] [cursor=pointer]
+          - generic [ref=e15]:
+            - generic [ref=e16]:
+              - text: Name
+              - textbox "Name" [ref=e17]:
+                - /placeholder: Your name
+                - text: QA Bot 222132
+            - generic [ref=e18]:
+              - text: Email
+              - textbox "Email" [ref=e19]: qa-2026-06-11-222132@qabot.dev
+            - button "Save" [ref=e21] [cursor=pointer]
+          - generic [ref=e22]:
+            - text: Activity
+            - generic [ref=e23]:
+              - generic [ref=e24]:
+                - generic [ref=e25]: "1"
+                - generic [ref=e26]: Notebooks
+              - generic [ref=e27]:
+                - generic [ref=e28]: "1"
+                - generic [ref=e29]: Notes
+          - generic [ref=e30]:
+            - text: Team
+            - generic [ref=e31]:
+              - generic [ref=e32]:
+                - heading "QA-2026-06-11_222132 Team" [level=3] [ref=e33]
+                - generic [ref=e34]: 1 member
+              - generic [ref=e35]:
+                - generic [ref=e36]: Invite code — share this with teammates
+                - generic [ref=e37]:
+                  - code [ref=e38]: 45aa1c940f76
+                  - button "Copy invite code" [ref=e39] [cursor=pointer]:
+                    - img [ref=e40]
+              - generic [ref=e42]:
+                - generic [ref=e43]: Members
+                - generic [ref=e45]:
+                  - generic [ref=e46]:
+                    - generic [ref=e47]: Q
+                    - generic [ref=e48]:
+                      - generic [ref=e49]: QA Bot 222132
+                      - generic [ref=e50]: qa-2026-06-11-222132@qabot.dev
+                  - generic [ref=e52]:
+                    - img [ref=e53]
+                    - text: admin
+              - generic [ref=e55]:
+                - generic [ref=e56]: Invite by email
+                - generic [ref=e57]:
+                  - textbox "colleague@company.com" [ref=e58]: qa-nobody-222132@example.invalid
+                  - button "Invite" [active] [ref=e59] [cursor=pointer]
+                - generic [ref=e132]: No user found with that email
+          - generic [ref=e60]:
+            - text: Account
+            - button "Sign out" [ref=e62] [cursor=pointer]
+  - alert [ref=e5]

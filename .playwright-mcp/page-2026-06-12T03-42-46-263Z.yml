@@ -1,0 +1,64 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e91]:
+    - navigation [ref=e92]:
+      - link "CheatBook" [ref=e94] [cursor=pointer]:
+        - /url: /
+        - img [ref=e95]
+        - generic [ref=e97]: CheatBook
+      - button "Search notes... Ctrl+K" [ref=e99] [cursor=pointer]:
+        - img [ref=e100]
+        - generic [ref=e102]: Search notes...
+        - generic [ref=e103]: Ctrl+K
+      - button "User menu" [ref=e106] [cursor=pointer]: Q
+    - generic [ref=e107]:
+      - complementary [ref=e108]:
+        - generic [ref=e109]:
+          - generic [ref=e110]:
+            - generic [ref=e111]: LIBRARY
+            - generic [ref=e112]:
+              - button "New note" [ref=e113] [cursor=pointer]:
+                - img [ref=e114]
+              - button "New notebook" [ref=e116] [cursor=pointer]:
+                - img [ref=e117]
+          - separator [ref=e119]
+          - generic [ref=e120]:
+            - button "Recent Notes" [ref=e121] [cursor=pointer]:
+              - img [ref=e122]
+              - generic [ref=e124]: Recent Notes
+            - button "QA-2026-06-11_222132 Editor Test 6m ago" [ref=e126] [cursor=pointer]:
+              - paragraph [ref=e127]: QA-2026-06-11_222132 Editor Test
+              - paragraph [ref=e128]: 6m ago
+          - generic [ref=e129]:
+            - button "Notebooks" [ref=e130] [cursor=pointer]:
+              - img [ref=e131]
+              - generic [ref=e133]: Notebooks
+            - generic [ref=e135]:
+              - button "QA-2026-06-11_222132 Sandbox 1" [ref=e136] [cursor=pointer]:
+                - img [ref=e137]
+                - img [ref=e139]
+                - generic [ref=e141]: QA-2026-06-11_222132 Sandbox
+                - generic [ref=e142]: "1"
+              - generic:
+                - button "QA-2026-06-11_222132 Editor Test 6m ago" [ref=e143] [cursor=pointer]:
+                  - paragraph [ref=e144]: QA-2026-06-11_222132 Editor Test
+                  - paragraph [ref=e145]: 6m ago
+                - button "Add note" [ref=e146] [cursor=pointer]:
+                  - img [ref=e147]
+                  - generic [ref=e149]: Add note
+          - generic [ref=e150]:
+            - button "Uncategorized" [ref=e151] [cursor=pointer]:
+              - img [ref=e152]
+              - generic [ref=e154]: Uncategorized
+            - paragraph [ref=e156]: No uncategorized notes
+      - main [ref=e157]:
+        - generic [ref=e158]:
+          - generic [ref=e159]:
+            - generic [ref=e160]:
+              - generic [ref=e163]:
+                - img [ref=e164]
+                - text: Saved
+              - generic [ref=e166]: Created by QA Bot 222132 · Edited by QA Bot 222132 6m ago
+            - button [ref=e169] [cursor=pointer]:
+              - img [ref=e170]
+          - textbox "Untitled" [ref=e174]: QA-2026-06-11_222132 Editor Test
+  - alert [ref=e5]: /notes/0110e6f8-fdbe-4994-a3cf-3db04fbf6a2d

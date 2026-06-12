@@ -1,0 +1,14 @@
+[   22695ms] [WARNING] The "fire" event api has been deprecated and will be removed in TinyMCE 9. Use "dispatch" instead. Error
+    at nE (https://thecheatbook.vercel.app/tinymce/tinymce.min.js:10:220220)
+    at lL.fire (https://thecheatbook.vercel.app/tinymce/tinymce.min.js:10:435614)
+    at eval (eval at <anonymous> (eval at evaluate (:303:30)), <anonymous>:20:6)
+    at eval (eval at evaluate (:303:30), <anonymous>:4:50)
+    at UtilityScript.evaluate (<anonymous>:305:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44) @ https://thecheatbook.vercel.app/tinymce/tinymce.min.js:9
+[   22695ms] [WARNING] The "fire" event api has been deprecated and will be removed in TinyMCE 9. Use "dispatch" instead. Error
+    at nE (https://thecheatbook.vercel.app/tinymce/tinymce.min.js:10:220220)
+    at lL.fire (https://thecheatbook.vercel.app/tinymce/tinymce.min.js:10:435614)
+    at eval (eval at <anonymous> (eval at evaluate (:303:30)), <anonymous>:21:6)
+    at eval (eval at evaluate (:303:30), <anonymous>:4:50)
+    at UtilityScript.evaluate (<anonymous>:305:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44) @ https://thecheatbook.vercel.app/tinymce/tinymce.min.js:9

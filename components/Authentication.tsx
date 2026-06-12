@@ -113,7 +113,7 @@ const Authentication: React.FC = () => {
               {isSignUp ? 'Create account' : 'Sign in'}
             </h2>
             <p className="text-sm text-text-secondary mt-2 font-body">
-              Enter your credentials
+              {isSignUp ? 'Sign up with your work email to get started' : 'Welcome back — enter your credentials'}
             </p>
           </div>
 

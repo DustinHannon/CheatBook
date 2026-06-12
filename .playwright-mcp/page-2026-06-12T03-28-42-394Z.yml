@@ -1,0 +1,121 @@
+- generic [ref=e1]:
+  - generic [ref=e311]:
+    - navigation [ref=e312]:
+      - link "CheatBook" [ref=e314] [cursor=pointer]:
+        - /url: /
+        - img [ref=e315]
+        - generic [ref=e317]: CheatBook
+      - button "Search notes... Ctrl+K" [ref=e319] [cursor=pointer]:
+        - img [ref=e320]
+        - generic [ref=e322]: Search notes...
+        - generic [ref=e323]: Ctrl+K
+      - button "User menu" [ref=e326] [cursor=pointer]: Q
+    - generic [ref=e327]:
+      - complementary [ref=e328]:
+        - generic [ref=e329]:
+          - generic [ref=e330]:
+            - generic [ref=e331]: LIBRARY
+            - generic [ref=e332]:
+              - button "New note" [ref=e333] [cursor=pointer]:
+                - img [ref=e334]
+              - button "New notebook" [ref=e336] [cursor=pointer]:
+                - img [ref=e337]
+          - separator [ref=e339]
+          - generic [ref=e340]:
+            - button "Recent Notes" [ref=e341] [cursor=pointer]:
+              - img [ref=e342]
+              - generic [ref=e344]: Recent Notes
+            - button "Untitled Just now" [ref=e346] [cursor=pointer]:
+              - paragraph [ref=e347]: Untitled
+              - paragraph [ref=e348]: Just now
+          - generic [ref=e349]:
+            - button "Notebooks" [ref=e350] [cursor=pointer]:
+              - img [ref=e351]
+              - generic [ref=e353]: Notebooks
+            - generic [ref=e355]:
+              - button "QA-2026-06-11_222132 Sandbox 1" [ref=e356] [cursor=pointer]:
+                - img [ref=e357]
+                - img [ref=e359]
+                - generic [ref=e361]: QA-2026-06-11_222132 Sandbox
+                - generic [ref=e362]: "1"
+              - generic:
+                - button "Untitled Just now" [ref=e363] [cursor=pointer]:
+                  - paragraph [ref=e364]: Untitled
+                  - paragraph [ref=e365]: Just now
+                - button "Add note" [ref=e366] [cursor=pointer]:
+                  - img [ref=e367]
+                  - generic [ref=e369]: Add note
+          - generic [ref=e370]:
+            - button "Uncategorized" [ref=e371] [cursor=pointer]:
+              - img [ref=e372]
+              - generic [ref=e374]: Uncategorized
+            - paragraph [ref=e376]: No uncategorized notes
+      - main [ref=e377]:
+        - generic [ref=e378]:
+          - generic [ref=e379]:
+            - generic [ref=e380]:
+              - generic [ref=e430]:
+                - img [ref=e431]
+                - text: Saved
+              - generic [ref=e386]: Created by QA Bot 222132 · Edited by QA Bot 222132 just now
+            - button [ref=e389] [cursor=pointer]:
+              - img [ref=e390]
+          - generic [ref=e393]:
+            - textbox "Untitled" [ref=e394]: QA-2026-06-11_222132 Editor Test
+            - application [ref=e395]:
+              - generic [ref=e396]:
+                - group [ref=e398]:
+                  - toolbar [ref=e399]:
+                    - button "Bold" [ref=e400]:
+                      - generic:
+                        - img
+                    - button "Italic" [ref=e401]:
+                      - generic:
+                        - img
+                    - button "Underline" [ref=e402]:
+                      - generic:
+                        - img
+                    - button "Strikethrough" [ref=e403]:
+                      - generic:
+                        - img
+                  - toolbar [ref=e404]:
+                    - button "Block Paragraph" [ref=e405]:
+                      - generic [ref=e406]: Paragraph
+                      - img [ref=e408]
+                  - toolbar [ref=e410]:
+                    - button "Bullet list" [ref=e411]:
+                      - generic:
+                        - img
+                    - button "Numbered list" [ref=e412]:
+                      - generic:
+                        - img
+                  - toolbar [ref=e413]:
+                    - button "Blockquote" [ref=e414]:
+                      - generic:
+                        - img
+                    - button "Insert/edit code sample" [ref=e415]:
+                      - generic:
+                        - img
+                  - toolbar [ref=e416]:
+                    - button "Insert/edit link" [ref=e417]:
+                      - generic:
+                        - img
+                    - button "Insert/edit image" [ref=e418]:
+                      - generic:
+                        - img
+                    - button "Table" [ref=e419]:
+                      - generic:
+                        - img
+                      - img [ref=e421]
+                  - toolbar [ref=e423]:
+                    - button "Horizontal line" [ref=e424]:
+                      - generic:
+                        - img
+                    - button "Clear formatting" [ref=e425]:
+                      - generic:
+                        - img
+                - iframe [active] [ref=e428]:
+                  - generic "Rich Text Area" [active] [ref=f1e1]:
+                    - text: Start writing...
+                    - paragraph [ref=f1e2]
+  - alert [ref=e25]: /notes/0110e6f8-fdbe-4994-a3cf-3db04fbf6a2d
