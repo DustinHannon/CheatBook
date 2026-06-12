@@ -11,7 +11,7 @@ An IT team notes app for quickly saving and sharing the things you need to remem
 - **Auth**: Supabase Auth (email + password with email confirmation)
 - **Real-time**: Supabase Realtime (Presence + Broadcast)
 - **Storage**: Supabase Storage (images, avatars)
-- **Editor**: TinyMCE 7 (self-hosted, GPL) with dark oxide skin
+- **Editor**: TinyMCE 8 (self-hosted, GPL) with dark oxide skin
 - **Styling**: Tailwind CSS 3 with dark editorial design system
 - **Typography**: Cormorant Garamond (display), DM Sans (body), JetBrains Mono (code)
 - **Hosting**: Vercel
