@@ -1,6 +1,10 @@
 node_modules
 .next
 out
+
+# Agent context — local working-tree only, never committed
+**/CLAUDE.md
+
 .env
 .env.local
 .env.development.local
