@@ -92,7 +92,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const confirmGrad = danger
     ? 'linear-gradient(160deg,#ff9bb4,#fb87a4)'
-    : 'linear-gradient(160deg,#7db0ff,#6ea8fe)';
+    : 'var(--accent-grad)';
 
   return (
     <div

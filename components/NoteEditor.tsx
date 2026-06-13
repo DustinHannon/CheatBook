@@ -65,6 +65,8 @@ interface NoteEditorProps {
   editable: boolean;
   onPeersChange?: (peers: EditorPeer[]) => void;
   onAttach?: () => void;
+  /** Bumped by the parent to open the image picker (command-palette upload action). */
+  imageNonce?: number;
 }
 
 /** Collaborative note body: TipTap + Yjs over Supabase, live carets, autosave. */
@@ -114,7 +116,7 @@ interface InnerProps extends NoteEditorProps {
 }
 
 const EditorInner: React.FC<InnerProps> = ({
-  ydoc, provider, status, note, me, editable, onPeersChange, onAttach,
+  ydoc, provider, status, note, me, editable, onPeersChange, onAttach, imageNonce,
 }) => {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -199,6 +201,9 @@ const EditorInner: React.FC<InnerProps> = ({
   // Keep ProseMirror editability in sync with the live lock state (note.isLocked
   // can flip via the realtime team subscription without remounting the editor).
   useEffect(() => { editor?.setEditable(editable); }, [editor, editable]);
+
+  // Open the image picker when the parent bumps imageNonce (palette upload action).
+  useEffect(() => { if (imageNonce && editable) fileInput.current?.click(); }, [imageNonce, editable]);
 
   // Report editing peers (excluding self) to the parent toolbar.
   useEffect(() => {

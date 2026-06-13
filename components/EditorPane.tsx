@@ -62,6 +62,21 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
   const [moveOpen, setMoveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [imageNonce, setImageNonce] = useState(0);
+
+  // Command-palette bridge: ?share=1 opens the Share panel; ?upload=1 triggers
+  // the image picker. Both strip their param after handling.
+  useEffect(() => {
+    const wantShare = router.query.share === '1';
+    const wantUpload = router.query.upload === '1';
+    if (!wantShare && !wantUpload) return;
+    if (wantShare) setShareOpen(true);
+    if (wantUpload) setImageNonce((n) => n + 1);
+    const rest = { ...router.query };
+    delete rest.share; delete rest.upload;
+    void router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.share, router.query.upload]);
 
   // ── Editable title (uncontrolled-ish: blur commits) ─────────────────
   const [title, setTitle] = useState(note.title);
@@ -119,7 +134,18 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
       setMenuOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); setMenuOpen(false); menuBtnRef.current?.focus(); }
+      if (e.key === 'Escape') { e.stopPropagation(); setMenuOpen(false); menuBtnRef.current?.focus(); return; }
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+      const items = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') || []);
+      if (!items.length) return;
+      e.preventDefault();
+      const idx = items.indexOf(document.activeElement as HTMLElement);
+      const next =
+        e.key === 'Home' ? 0
+        : e.key === 'End' ? items.length - 1
+        : e.key === 'ArrowDown' ? (idx < 0 ? 0 : (idx + 1) % items.length)
+        : (idx <= 0 ? items.length - 1 : idx - 1);
+      items[next]?.focus();
     };
     const id = requestAnimationFrame(() => {
       menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
@@ -329,7 +355,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
             className="flex cursor-pointer items-center gap-[7px] font-bold hover:brightness-[1.07]"
             style={{
               height: 32, minHeight: 44, padding: '0 14px', borderRadius: 10, fontSize: 12.5,
-              color: '#0a0f1a', background: 'linear-gradient(160deg,#7db0ff,#6ea8fe)',
+              color: '#0a0f1a', background: 'var(--accent-grad)',
               boxShadow: '0 6px 16px -6px rgba(110,168,254,0.8)',
             }}
           >
@@ -461,6 +487,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
               editable={!note.isLocked}
               onPeersChange={setPeers}
               onAttach={note.isLocked ? undefined : () => attachInputRef.current?.click()}
+              imageNonce={imageNonce}
             />
           )}
 

@@ -223,7 +223,7 @@ export const InputDialog: React.FC<InputDialogProps> = ({
               fontSize: 13,
               fontWeight: 700,
               color: '#0a0f1a',
-              background: 'linear-gradient(160deg,#7db0ff,#6ea8fe)',
+              background: 'var(--accent-grad)',
               border: 'none',
               opacity: trimmedEmpty ? 0.5 : 1,
             }}

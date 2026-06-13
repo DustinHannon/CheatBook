@@ -93,7 +93,7 @@ export const NoteList: React.FC<NoteListProps> = ({
               className="flex cursor-pointer items-center gap-[7px] font-bold hover:brightness-[1.07]"
               style={{
                 height: 30, minHeight: 44, padding: '0 12px', borderRadius: 9, fontSize: 12.5,
-                color: '#0a0f1a', background: 'linear-gradient(160deg,#7db0ff,#6ea8fe)',
+                color: '#0a0f1a', background: 'var(--accent-grad)',
                 boxShadow: '0 6px 16px -6px rgba(110,168,254,0.8)',
               }}
             >
@@ -117,8 +117,8 @@ export const NoteList: React.FC<NoteListProps> = ({
                   style={{
                     padding: '6px 12px', borderRadius: 9, fontSize: 12,
                     color: on ? '#0a0f1a' : '#aeb9ca',
-                    background: on ? '#6ea8fe' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${on ? '#6ea8fe' : 'rgba(255,255,255,0.08)'}`,
+                    background: on ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${on ? 'var(--accent)' : 'rgba(255,255,255,0.08)'}`,
                   }}
                 >
                   {c.label}

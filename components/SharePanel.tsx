@@ -303,7 +303,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 minHeight: 40, height: 40, padding: '0 14px', borderRadius: 11,
                 fontSize: 12.5, fontWeight: 700, color: '#0a0f1a',
-                background: 'linear-gradient(160deg,#7db0ff,#6ea8fe)',
+                background: 'var(--accent-grad)',
                 cursor: email.trim() && !inviting ? 'pointer' : 'not-allowed',
                 opacity: email.trim() && !inviting ? 1 : 0.6,
                 filter: 'brightness(1)', whiteSpace: 'nowrap',
@@ -347,7 +347,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
               style={{
                 width: 44, height: 26, borderRadius: 20, cursor: loading ? 'default' : 'pointer',
                 position: 'relative', transition: 'background .15s', padding: 0, border: 'none',
-                background: linkOn ? '#6ea8fe' : 'rgba(255,255,255,0.12)',
+                background: linkOn ? 'var(--accent)' : 'rgba(255,255,255,0.12)',
               }}
             >
               <span
@@ -542,7 +542,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
             style={{
               flex: 1, minHeight: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
               borderRadius: 11, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#0a0f1a',
-              background: 'linear-gradient(160deg,#7db0ff,#6ea8fe)', border: 'none',
+              background: 'var(--accent-grad)', border: 'none',
             }}
             onMouseEnter={(e) => { e.currentTarget.style.filter = 'brightness(1.07)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.filter = 'brightness(1)'; }}

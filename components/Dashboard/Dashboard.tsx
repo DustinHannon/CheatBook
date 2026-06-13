@@ -169,7 +169,7 @@ export const Dashboard: React.FC = () => {
             style={{
               height: 38, minHeight: 38, padding: '0 16px', borderRadius: 11,
               fontSize: 13, fontWeight: 700, color: '#0a0f1a', cursor: 'pointer',
-              background: 'linear-gradient(160deg,#7db0ff,#6ea8fe)',
+              background: 'var(--accent-grad)',
               boxShadow: '0 8px 20px -8px rgba(110,168,254,0.8)',
             }}
           >

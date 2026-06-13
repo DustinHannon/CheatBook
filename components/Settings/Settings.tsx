@@ -223,7 +223,7 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
               fontSize: 13,
               fontWeight: 700,
               color: '#0a0f1a',
-              background: 'linear-gradient(160deg,#7db0ff,#6ea8fe)',
+              background: 'var(--accent-grad)',
               border: 'none',
               boxShadow: '0 8px 20px -8px rgba(110,168,254,0.8)',
               opacity: saving ? 0.75 : 1,

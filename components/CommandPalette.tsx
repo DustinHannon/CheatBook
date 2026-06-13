@@ -114,15 +114,16 @@ export const CommandPalette: React.FC = () => {
     else showToast('Could not create note.', 'error');
   }, [closePalette, firstSpaceId, createNote, router, showToast]);
 
+  // Target note for note-scoped actions: the open note, else the most recent.
+  const targetNoteId = currentNoteId
+    || (typeof router.query.note === 'string' ? router.query.note : undefined)
+    || notes[0]?.id;
+
   const runInvite = useCallback(() => {
     closePalette();
-    if (currentNoteId) {
-      router.push('/notes/' + currentNoteId);
-      showToast('Open the Share panel on this note to invite a teammate.', 'info');
-    } else {
-      showToast('Open a note first, then use Share to invite a teammate.', 'info');
-    }
-  }, [closePalette, currentNoteId, router, showToast]);
+    if (!targetNoteId) { showToast('Create a note first, then invite a teammate.', 'info'); return; }
+    router.push(`/notes/${targetNoteId}?share=1`); // EditorPane opens the Share panel
+  }, [closePalette, targetNoteId, router, showToast]);
 
   const runDashboard = useCallback(() => {
     closePalette();
@@ -131,13 +132,9 @@ export const CommandPalette: React.FC = () => {
 
   const runUpload = useCallback(() => {
     closePalette();
-    if (currentNoteId) {
-      router.push('/notes/' + currentNoteId);
-      showToast('Drag an image into the editor or paste it to upload.', 'info');
-    } else {
-      showToast('Open a note first to upload an image.', 'info');
-    }
-  }, [closePalette, currentNoteId, router, showToast]);
+    if (!targetNoteId) { showToast('Create a note first to upload an image.', 'info'); return; }
+    router.push(`/notes/${targetNoteId}?upload=1`); // EditorPane triggers the image picker
+  }, [closePalette, targetNoteId, router, showToast]);
 
   const actionDefs = useMemo<ActionDef[]>(() => [
     { id: 'new', label: 'Create a new note', pathD: PATH_NEW, hotkey: 'N', run: runCreateNote },
