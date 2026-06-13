@@ -407,14 +407,17 @@ const SpaceManageDialog: React.FC<{
 }> = ({ space, onSave, onDelete, onClose }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const restoreRef = useRef<HTMLElement | null>(null);
   const [name, setName] = useState(space.name);
   const [color, setColor] = useState(space.color);
 
   useEffect(() => {
+    restoreRef.current = (document.activeElement as HTMLElement) ?? null;
     const id = requestAnimationFrame(() => { inputRef.current?.focus(); inputRef.current?.select(); });
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
     document.addEventListener('keydown', onKey);
-    return () => { cancelAnimationFrame(id); document.removeEventListener('keydown', onKey); };
+    // Restore focus to the trigger (the kebab) when the dialog closes.
+    return () => { cancelAnimationFrame(id); document.removeEventListener('keydown', onKey); restoreRef.current?.focus?.(); };
   }, [onClose]);
 
   const trimmed = name.trim();
@@ -431,7 +434,7 @@ const SpaceManageDialog: React.FC<{
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={`Manage ${space.name}`}
+        aria-labelledby="cb-manage-space-title"
         className="animate-cb-up"
         style={{
           width: 'min(420px,92vw)', borderRadius: 18, overflow: 'hidden', padding: '24px 24px 20px',
@@ -439,7 +442,7 @@ const SpaceManageDialog: React.FC<{
           border: '1px solid var(--modal-border)', boxShadow: 'var(--modal-shadow)',
         }}
       >
-        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}>Manage space</h2>
+        <h2 id="cb-manage-space-title" style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}>Manage space</h2>
 
         <label htmlFor="cb-space-name" className="cb-mono" style={{ display: 'block', marginTop: 18, marginBottom: 8, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-4)' }}>
           Name

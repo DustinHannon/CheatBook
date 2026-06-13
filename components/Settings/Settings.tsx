@@ -196,7 +196,7 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <div style={{ lineHeight: 1.1 }}>
-          <div className="font-mono" style={{ fontSize: 10, letterSpacing: '0.08em', color: '#6ea8fe', marginBottom: 4 }}>
+          <div className="font-mono" style={{ fontSize: 10, letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: 4 }}>
             CHEATBOOK / SETTINGS
           </div>
           <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>Settings</div>
@@ -373,9 +373,9 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
         .cb-set-save:hover:not(:disabled) { filter: brightness(1.07); }
         .cb-set-navrow:hover { background: var(--bg-hover); color: var(--text-strong); }
         .cb-set-ghost:hover:not(:disabled) { background: var(--bg-hover); }
-        .cb-set-remove:not(:disabled):hover { color: var(--danger); background: rgba(251,135,164,0.08); }
-        .cb-set-danger-btn:hover { background: rgba(251,135,164,0.12); }
-        .cb-set-signout-others:hover:not(:disabled) { background: rgba(251,135,164,0.1); }
+        .cb-set-remove:not(:disabled):hover { color: var(--danger); background: var(--danger-soft); }
+        .cb-set-danger-btn:hover { background: var(--danger-soft); }
+        .cb-set-signout-others:hover:not(:disabled) { background: var(--danger-soft); }
         .cb-set-accent:hover { filter: brightness(1.1); }
         .cb-set-density:hover { background: var(--bg-hover); }
         .cb-set-input:focus { border-color: rgba(110,168,254,0.5); }
