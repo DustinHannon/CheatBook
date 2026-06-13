@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
 import { createClient } from '../lib/supabase/client';
 import { useAuth } from './AuthContext';
+import { useToast } from './Toast';
 import { updateAppearance } from '../lib/api';
 import type { Appearance, Density } from '../lib/types';
 
@@ -34,19 +35,25 @@ function applyAccent(accent: string) {
 
 export const AppearanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT);
+  // Mirror of the latest committed appearance so rapid successive changes build
+  // off the newest value (not a stale render-scoped closure) and reverts target
+  // the correct prior state.
+  const appearanceRef = useRef<Appearance>(DEFAULT);
+  const commit = useCallback((a: Appearance) => { appearanceRef.current = a; setAppearance(a); }, []);
 
   // Load saved appearance once authenticated.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    supabase.from('profiles').select('appearance').eq('id', user.id).single().then(({ data }) => {
-      if (cancelled || !data?.appearance) return;
+    supabase.from('profiles').select('appearance').eq('id', user.id).maybeSingle().then(({ data, error }) => {
+      if (cancelled || error || !data?.appearance) return;
       const a = data.appearance as unknown as Appearance;
-      setAppearance({ accent: a.accent || DEFAULT.accent, density: a.density || DEFAULT.density });
+      commit({ accent: a.accent || DEFAULT.accent, density: a.density || DEFAULT.density });
     });
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, commit]);
 
   // Apply to the document whenever it changes.
   useEffect(() => {
@@ -54,13 +61,21 @@ export const AppearanceProvider: React.FC<{ children: ReactNode }> = ({ children
     document.documentElement.setAttribute('data-density', appearance.density);
   }, [appearance]);
 
+  // Optimistic commit; the network write is a side effect OUTSIDE the state
+  // updater, and reverts to the captured prior value on failure.
   const persist = useCallback((next: Appearance) => {
-    setAppearance(next);
-    if (user) updateAppearance(supabase, next).catch(() => {});
-  }, [user]);
+    const prev = appearanceRef.current;
+    commit(next);
+    if (user) {
+      updateAppearance(supabase, next).catch(() => {
+        commit(prev);
+        showToast('Could not save appearance.', 'error');
+      });
+    }
+  }, [user, showToast, commit]);
 
-  const setAccent = useCallback((accent: string) => persist({ ...appearance, accent }), [appearance, persist]);
-  const setDensity = useCallback((density: Density) => persist({ ...appearance, density }), [appearance, persist]);
+  const setAccent = useCallback((accent: string) => persist({ ...appearanceRef.current, accent }), [persist]);
+  const setDensity = useCallback((density: Density) => persist({ ...appearanceRef.current, density }), [persist]);
 
   return (
     <AppearanceContext.Provider value={{ appearance, setAccent, setDensity }}>

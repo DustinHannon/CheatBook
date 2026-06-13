@@ -11,6 +11,8 @@ interface NoteListProps {
   activeChip: FilterChip;
   onChip: (c: FilterChip) => void;
   onNew: () => void;
+  sort: 'updated' | 'title';
+  onToggleSort: () => void;
 }
 
 const CHIP_DEFS: { id: FilterChip; label: string }[] = [
@@ -43,7 +45,7 @@ function emptyFor(scope: Scope): string {
  * (scope=all only), scope subtitle, scrollable NoteCard list, empty states.
  */
 export const NoteList: React.FC<NoteListProps> = ({
-  scope, notes, selectedId, onSelect, activeChip, onChip, onNew,
+  scope, notes, selectedId, onSelect, activeChip, onChip, onNew, sort, onToggleSort,
 }) => {
   const { openNav } = useApp();
 
@@ -70,14 +72,20 @@ export const NoteList: React.FC<NoteListProps> = ({
           <h2 className="m-0 font-extrabold" style={{ fontSize: 18, letterSpacing: '-0.02em' }}>{title}</h2>
           <span className="mt-[2px] font-mono text-text-4" style={{ fontSize: 11 }}>{notes.length} notes</span>
           <div className="ml-auto flex gap-[6px]">
-            <div
-              aria-hidden="true"
-              className="grid cursor-pointer place-items-center border border-white/[0.07] text-text-3 hover:bg-white/[0.05] hover:text-text-1"
-              style={{ width: 30, height: 30, borderRadius: 9 }}
-              title="Sort"
+            <button
+              type="button"
+              onClick={onToggleSort}
+              aria-label={sort === 'title' ? 'Sorted A–Z — click to sort by recently updated' : 'Sorted by recently updated — click to sort A–Z'}
+              title={sort === 'title' ? 'Sorted A–Z' : 'Sorted by recently updated'}
+              className="grid cursor-pointer place-items-center border border-white/[0.07] hover:bg-white/[0.05] hover:text-text-1"
+              style={{ width: 30, height: 30, borderRadius: 9, color: sort === 'title' ? 'var(--accent)' : '#8b97ab' }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
-            </div>
+              {sort === 'title' ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 7h10M5 12h7M5 17h4M16 7v10M16 17l3-3M16 17l-3-3" /></svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+              )}
+            </button>
             <button
               type="button"
               onClick={onNew}

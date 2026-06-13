@@ -94,13 +94,16 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
   const prefsSeeded = useRef(false);
   useEffect(() => {
     if (prefsSeeded.current || !me) return;
-    prefsSeeded.current = true;
     supabase
       .from('profiles')
       .select('notification_prefs')
       .eq('id', me.id)
       .single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        // On a transient read failure, leave the seed flag unset so a later
+        // render can retry — don't lock in DEFAULT_PREFS and clobber stored prefs.
+        if (error) return;
+        prefsSeeded.current = true;
         const p = data?.notification_prefs as Partial<NotificationPrefs> | null | undefined;
         if (p && typeof p === 'object') setPrefs({ ...DEFAULT_PREFS, ...p });
       });

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { uploadAvatar, updateProfile } from '../../lib/api';
+import { uploadAvatar, removeAvatar } from '../../lib/api';
 import { useToast } from '../Toast';
 import { Avatar } from '../ui/Avatar';
 import type { Member } from '../../lib/types';
@@ -60,7 +60,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
 
   const removePhoto = useCallback(async () => {
     try {
-      await updateProfile(supabase, { avatar: '' });
+      await removeAvatar(supabase);
       onAvatarChanged('');
       showToast('Profile photo removed.', 'success');
     } catch (err) {

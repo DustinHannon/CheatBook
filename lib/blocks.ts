@@ -6,35 +6,10 @@ import type { Json } from './database.types';
 type PMNode = { type: string; attrs?: Record<string, unknown>; content?: PMNode[]; text?: string };
 export type TipTapDoc = { type: 'doc'; content: PMNode[] };
 
-export const text = (s: string): PMNode => ({ type: 'text', text: s });
-export const paragraph = (s = ''): PMNode => ({ type: 'paragraph', content: s ? [text(s)] : [] });
-export const heading = (level: number, s: string): PMNode => ({ type: 'heading', attrs: { level }, content: [text(s)] });
-export const codeBlock = (s: string, language: string | null = null): PMNode => ({
-  type: 'codeBlock', attrs: { language }, content: [text(s)],
-});
-// Callouts render as styled blockquotes (keeps the schema standard + collaboration-safe).
-export const callout = (s: string): PMNode => ({ type: 'blockquote', content: [paragraph(s)] });
-export const taskList = (items: { text: string; checked: boolean }[]): PMNode => ({
-  type: 'taskList',
-  content: items.map((it) => ({ type: 'taskItem', attrs: { checked: it.checked }, content: [paragraph(it.text)] })),
-});
+const text = (s: string): PMNode => ({ type: 'text', text: s });
+const paragraph = (s = ''): PMNode => ({ type: 'paragraph', content: s ? [text(s)] : [] });
 
 export const emptyDoc = (): TipTapDoc => ({ type: 'doc', content: [paragraph('')] });
-
-/** Build a TipTap doc from the reference fixture block shape ({k:'p'|'h2'|'callout'|'code', text}). */
-export function fixtureToDoc(blocks: { k: string; text: string }[] | undefined): TipTapDoc {
-  if (!blocks || !blocks.length) return emptyDoc();
-  const content: PMNode[] = blocks.map((b) => {
-    switch (b.k) {
-      case 'h2': return heading(2, b.text);
-      case 'h3': return heading(3, b.text);
-      case 'callout': return callout(b.text);
-      case 'code': return codeBlock(b.text);
-      default: return paragraph(b.text);
-    }
-  });
-  return { type: 'doc', content };
-}
 
 function walkText(node: PMNode | undefined, out: string[]): void {
   if (!node) return;

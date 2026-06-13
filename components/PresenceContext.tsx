@@ -43,8 +43,9 @@ export const PresenceProvider: React.FC<{ children: ReactNode }> = ({ children }
       });
 
     return () => {
-      channel.untrack();
-      supabase.removeChannel(channel);
+      channel.untrack().finally(() => {
+        supabase.removeChannel(channel);
+      });
     };
   }, [user]);
 

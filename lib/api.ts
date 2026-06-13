@@ -4,7 +4,7 @@ import type {
   Permission, NotificationPrefs, Appearance,
 } from './types';
 import { initials, colorForId } from './colors';
-import { snippetFromDoc, docToText, docHasImage, emptyDoc } from './blocks';
+import { snippetFromDoc, docToText, docHasImage, emptyDoc, legacyToDoc } from './blocks';
 import type { Json } from './database.types';
 
 // We use a loosely-typed client here; rows are mapped explicitly into domain types.
@@ -105,6 +105,15 @@ export async function createSpace(supabase: DB, name: string, color = '#6ea8fe')
 const NOTE_SELECT =
   '*, notebooks!inner(id,title,color,team_id), owner:owner_id(name), editor:last_edited_by(name), note_attachments(count), note_collaborators(user_id,permission)';
 
+// Coerce a stored note body into a valid TipTap doc. Guards against the column
+// default ('[]' array), legacy HTML strings, and malformed jsonb so the editor
+// never receives a non-doc shape (which setContent would reject).
+function normalizeBody(b: unknown): Json {
+  if (typeof b === 'string') return legacyToDoc(b) as unknown as Json;
+  if (b && typeof b === 'object' && !Array.isArray(b) && (b as { type?: string }).type === 'doc') return b as Json;
+  return emptyDoc() as unknown as Json;
+}
+
 function mapNote(row: any, starredIds: Set<string>): Note {
   const space = row.notebooks
     ? { id: row.notebooks.id, name: row.notebooks.title, color: row.notebooks.color || '#6ea8fe' }
@@ -118,7 +127,7 @@ function mapNote(row: any, starredIds: Set<string>): Note {
     title: row.title,
     ownerId: row.owner_id,
     collaboratorIds,
-    body: (row.body && Object.keys(row.body).length ? row.body : emptyDoc()) as Json,
+    body: normalizeBody(row.body),
     snippet: row.snippet || snippetFromDoc(row.body) || '',
     tags: row.tags || [],
     pinned: !!row.is_pinned,
@@ -145,22 +154,13 @@ async function getStarredSet(supabase: DB): Promise<Set<string>> {
   } catch { return new Set(); }
 }
 
-async function getHiddenSet(supabase: DB): Promise<Set<string>> {
-  try {
-    const user = await getCurrentUser(supabase);
-    const { data } = await supabase.from('hidden_notes').select('note_id').eq('user_id', user.id);
-    return new Set((data || []).map((r: any) => r.note_id));
-  } catch { return new Set(); }
-}
-
 export async function getNotes(supabase: DB, teamId: string): Promise<Note[]> {
-  const [{ data, error }, starred, hidden] = await Promise.all([
+  const [{ data, error }, starred] = await Promise.all([
     supabase.from('notes').select(NOTE_SELECT).eq('notebooks.team_id', teamId).order('updated_at', { ascending: false }),
     getStarredSet(supabase),
-    getHiddenSet(supabase),
   ]);
   if (error) throw error;
-  return (data || []).filter((n: any) => !hidden.has(n.id)).map((n: any) => mapNote(n, starred));
+  return (data || []).map((n: any) => mapNote(n, starred));
 }
 
 export async function getNote(supabase: DB, noteId: string): Promise<Note> {
@@ -198,12 +198,12 @@ export async function updateNoteMeta(
 /** Snapshot the editor's TipTap doc back to the DB row (snippet/content derived for list+search). */
 export async function saveNoteSnapshot(supabase: DB, noteId: string, body: Json, title?: string): Promise<void> {
   const user = await getCurrentUser(supabase);
+  // updated_at is set server-side by the on_note_update trigger.
   const payload: any = {
     body,
     snippet: snippetFromDoc(body),
     content: docToText(body),
     last_edited_by: user.id,
-    updated_at: new Date().toISOString(),
   };
   if (title !== undefined) payload.title = title;
   const { error } = await supabase.from('notes').update(payload).eq('id', noteId);
@@ -233,6 +233,12 @@ export async function duplicateNote(supabase: DB, noteId: string): Promise<Note>
     })
     .select(NOTE_SELECT).single();
   if (error) throw error;
+  // Carry the source's CRDT state so the copy opens with current content
+  // (notes.body can lag the live Yjs doc by up to the snapshot debounce).
+  const { data: yjs } = await supabase.from('yjs_documents').select('state').eq('note_id', noteId).maybeSingle();
+  if (yjs?.state) {
+    await supabase.from('yjs_documents').insert({ note_id: data.id, state: yjs.state });
+  }
   return mapNote(data, new Set());
 }
 
@@ -265,18 +271,6 @@ export async function setStar(supabase: DB, noteId: string, starred: boolean): P
   }
 }
 
-// ─── Hidden notes (per-user) ──────────────────────────────────────────
-export async function hideNote(supabase: DB, noteId: string): Promise<void> {
-  const user = await getCurrentUser(supabase);
-  const { error } = await supabase.from('hidden_notes').insert({ user_id: user.id, note_id: noteId });
-  if (error) throw error;
-}
-export async function unhideNote(supabase: DB, noteId: string): Promise<void> {
-  const user = await getCurrentUser(supabase);
-  const { error } = await supabase.from('hidden_notes').delete().eq('user_id', user.id).eq('note_id', noteId);
-  if (error) throw error;
-}
-
 // ─── Search ───────────────────────────────────────────────────────────
 export async function searchNotes(supabase: DB, teamId: string, query: string): Promise<Note[]> {
   const q = query.trim();
@@ -284,15 +278,14 @@ export async function searchNotes(supabase: DB, teamId: string, query: string): 
   // Escape backslash/quote then wrap in quotes so PostgREST treats punctuation
   // literally instead of as .or() filter syntax (prevents filter injection).
   const term = q.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  const [{ data, error }, starred, hidden] = await Promise.all([
+  const [{ data, error }, starred] = await Promise.all([
     supabase.from('notes').select(NOTE_SELECT).eq('notebooks.team_id', teamId)
       .or(`title.ilike."%${term}%",content.ilike."%${term}%"`)
       .order('updated_at', { ascending: false }).limit(50),
     getStarredSet(supabase),
-    getHiddenSet(supabase),
   ]);
   if (error) throw error;
-  return (data || []).filter((n: any) => !hidden.has(n.id)).map((n: any) => mapNote(n, starred));
+  return (data || []).map((n: any) => mapNote(n, starred));
 }
 
 // ─── Collaborators / share grants ─────────────────────────────────────
@@ -505,11 +498,16 @@ function hexToBytes(hex: string): Uint8Array {
   return out;
 }
 
-// ─── Team helpers (kept for member management in Settings) ─────────────
-export async function getTeam(supabase: DB): Promise<{ id: string; name: string; invite_code: string | null } | null> {
-  const teamId = await getUserTeamId(supabase);
-  if (!teamId) return null;
-  const { data, error } = await supabase.from('teams').select('*').eq('id', teamId).single();
+/** Clear the profile avatar AND remove the orphaned storage object. */
+export async function removeAvatar(supabase: DB): Promise<void> {
+  const user = await getCurrentUser(supabase);
+  const { data: profile } = await supabase.from('profiles').select('avatar').eq('id', user.id).maybeSingle();
+  const url: string | undefined = profile?.avatar ?? undefined;
+  const marker = '/object/public/avatars/';
+  if (url && url.includes(marker)) {
+    const path = decodeURIComponent(url.slice(url.indexOf(marker) + marker.length).split('?')[0]);
+    if (path) await supabase.storage.from('avatars').remove([path]);
+  }
+  const { error } = await supabase.from('profiles').update({ avatar: null }).eq('id', user.id);
   if (error) throw error;
-  return data;
 }

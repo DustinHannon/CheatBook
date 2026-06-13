@@ -11,16 +11,4 @@ export const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) =
   />
 );
 
-/** Convenience: N shimmer lines for text-block placeholders. */
-export const SkeletonText: React.FC<{ lines?: number; className?: string }> = ({
-  lines = 3,
-  className = '',
-}) => (
-  <div className={`flex flex-col gap-2 ${className}`} aria-hidden="true">
-    {Array.from({ length: lines }).map((_, i) => (
-      <Skeleton key={i} className={i === lines - 1 ? 'h-3 w-2/3' : 'h-3'} />
-    ))}
-  </div>
-);
-
 export default Skeleton;

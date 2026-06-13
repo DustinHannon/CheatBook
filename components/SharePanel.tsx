@@ -5,7 +5,7 @@ import { useToast } from './Toast';
 import { Skeleton } from './ui/Skeleton';
 import {
   getNote, getCollaborators, addCollaboratorByEmail, setCollaboratorPermission,
-  getLinkShare, setLinkShare,
+  removeCollaborator, getLinkShare, setLinkShare,
 } from '../lib/api';
 import { hexa } from '../lib/colors';
 import type { Member, Permission, ShareGrant } from '../lib/types';
@@ -143,8 +143,19 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
           (x) => x.username?.toLowerCase() === handle || x.name.toLowerCase() === handle,
         );
         if (!m) throw new Error('No teammate found with that @name.');
+        // Never downgrade an existing owner/editor to view.
+        if (grants.some((g) => g.userId === m.id)) {
+          showToast('That teammate already has access.', 'info');
+          return;
+        }
         await setCollaboratorPermission(supabase, noteId, m.id, 'view');
       } else {
+        // Resolve to a member id so we can detect an existing grant before inviting.
+        const m = members.find((x) => x.email.toLowerCase() === value.toLowerCase());
+        if (m && grants.some((g) => g.userId === m.id)) {
+          showToast('That teammate already has access.', 'info');
+          return;
+        }
         await addCollaboratorByEmail(supabase, noteId, value);
       }
       setEmail('');
@@ -155,7 +166,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
     } finally {
       setInviting(false);
     }
-  }, [email, inviting, noteId, reloadAccess, showToast, members]);
+  }, [email, inviting, noteId, reloadAccess, showToast, members, grants]);
 
   const handleToggleLink = useCallback(async () => {
     const next = !linkOn;
@@ -181,6 +192,20 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
       showToast('Could not update permission.', 'error');
     }
   }, [grants, noteId, showToast]);
+
+  const handleRemove = useCallback(async (userId: string) => {
+    setOpenMenuFor(null);
+    const prev = grants;
+    setGrants((g) => g.filter((x) => x.userId !== userId)); // optimistic
+    try {
+      await removeCollaborator(supabase, noteId, userId);
+      showToast('Access removed.', 'success');
+      await reloadAccess();
+    } catch {
+      setGrants(prev);
+      showToast('Could not remove access.', 'error');
+    }
+  }, [grants, noteId, reloadAccess, showToast]);
 
   const handleCopyLink = useCallback(async () => {
     try {
@@ -460,6 +485,30 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
                               </li>
                             );
                           })}
+                          {!row.isYou && (
+                            <li role="option" aria-selected={false}>
+                              <button
+                                type="button"
+                                onClick={() => handleRemove(row.userId)}
+                                aria-label={`Remove access for ${row.member.name}`}
+                                className="hover:bg-white/[0.06]"
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 8,
+                                  width: '100%', minHeight: 34, padding: '7px 10px', borderRadius: 8,
+                                  marginTop: 4, paddingTop: 9,
+                                  border: 'none', borderTop: '1px solid rgba(255,255,255,0.07)',
+                                  fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                                  color: '#ff8fa3', background: 'transparent',
+                                  textAlign: 'left',
+                                }}
+                              >
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                                </svg>
+                                Remove access
+                              </button>
+                            </li>
+                          )}
                         </ul>
                       )}
                     </div>

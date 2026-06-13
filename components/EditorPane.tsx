@@ -8,7 +8,7 @@ import { relativeTime, fileSize } from '../lib/time';
 import { docToMarkdown } from '../lib/blocks';
 import { createClient } from '../lib/supabase/client';
 import {
-  updateNoteMeta, moveNoteToSpace, duplicateNote, deleteNote, getActivity,
+  updateNoteMeta, moveNoteToSpace, duplicateNote, deleteNote, getActivity, setLocked,
   getAttachments, uploadAttachment, deleteAttachment,
 } from '../lib/api';
 import { NoteEditor, type EditorPeer } from './NoteEditor';
@@ -19,6 +19,8 @@ const supabase = createClient();
 
 interface EditorPaneProps {
   note: Note;
+  /** Scope-aware "back to list" for the mobile single-pane layout. */
+  onBack?: () => void;
 }
 
 type OverflowAction = {
@@ -41,10 +43,11 @@ const ico = (d: string, fill = 'none', sw = '1.8') => (
  * body eyebrow/title/tags from lines 381–390; attachments from lines 364–376.
  * All overflow actions are fully wired against lib/api.
  */
-export const EditorPane: React.FC<EditorPaneProps> = ({ note }) => {
+export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
   const router = useRouter();
   const { me, setPinned, toggleStar, refreshNotes, spaces } = useApp();
   const { showToast } = useToast();
+  const attachInputRef = useRef<HTMLInputElement>(null);
 
   const spaceColor = note.space?.color || '#6ea8fe';
   const spaceName = note.space?.name || 'Notes';
@@ -177,6 +180,17 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note }) => {
     }
   }, [note.id, refreshNotes, showToast]);
 
+  const doLock = useCallback(async () => {
+    setMenuOpen(false);
+    try {
+      await setLocked(supabase, note.id, !note.isLocked);
+      void refreshNotes();
+      showToast(note.isLocked ? 'Note unlocked.' : 'Note locked — editing disabled for the team.', 'success');
+    } catch {
+      showToast('Could not change the lock state.', 'error');
+    }
+  }, [note.id, note.isLocked, refreshNotes, showToast]);
+
   const doDelete = useCallback(async () => {
     setDeleteOpen(false);
     try {
@@ -194,6 +208,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note }) => {
       key: 'pin', label: note.pinned ? 'Unpin note' : 'Pin note',
       icon: ico('M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8z', note.pinned ? 'currentColor' : 'none'),
       onRun: () => { setMenuOpen(false); void setPinned(note.id, !note.pinned); },
+    },
+    {
+      key: 'lock', label: note.isLocked ? 'Unlock note' : 'Lock note',
+      icon: ico(note.isLocked ? 'M7 11h10v9H7z|M9 11V8a3 3 0 0 1 6 0' : 'M5 11h14v10H5z|M8 11V7a4 4 0 0 1 8 0v4'),
+      onRun: () => { void doLock(); },
     },
     {
       key: 'copy', label: 'Copy link',
@@ -234,7 +253,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note }) => {
         {/* mobile back to list */}
         <button
           type="button"
-          onClick={() => router.push('/notes')}
+          onClick={() => (onBack ? onBack() : router.push('/notes'))}
           aria-label="Back to notes"
           className="grid flex-none cursor-pointer place-items-center border border-white/[0.08] text-text-2 hover:bg-white/[0.06] md:hidden"
           style={{ width: 32, height: 32, minWidth: 44, minHeight: 44, borderRadius: 9 }}
@@ -441,11 +460,12 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note }) => {
               me={me}
               editable={!note.isLocked}
               onPeersChange={setPeers}
+              onAttach={note.isLocked ? undefined : () => attachInputRef.current?.click()}
             />
           )}
 
           {/* attachments */}
-          <AttachmentsSection noteId={note.id} locked={note.isLocked} />
+          <AttachmentsSection noteId={note.id} locked={note.isLocked} inputRef={attachInputRef} />
         </div>
       </div>
 
@@ -630,12 +650,12 @@ const VersionHistoryDialog: React.FC<{ noteId: string; onClose: () => void }> = 
 };
 
 // ── Attachments section (lifted from reference lines 364–376) ────────
-const AttachmentsSection: React.FC<{ noteId: string; locked: boolean }> = ({ noteId, locked }) => {
+const AttachmentsSection: React.FC<{ noteId: string; locked: boolean; inputRef: React.RefObject<HTMLInputElement | null> }> = ({ noteId, locked, inputRef }) => {
   const { showToast } = useToast();
   const [items, setItems] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
+  const fileInput = inputRef;
 
   const reload = useCallback(async () => {
     try {

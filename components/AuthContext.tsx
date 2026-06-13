@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback, useRef } from 'react';
 import { createClient } from '../lib/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
@@ -41,18 +41,37 @@ function mapUser(u: SupabaseUser): User {
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Track the last user we committed so token refreshes (which emit a fresh
+  // SupabaseUser each time) don't churn a new object reference when the
+  // identity is unchanged — downstream effects key on this object.
+  const userRef = useRef<User | null>(null);
+
+  // Returns true when the user reference changed (and updates state + ref).
+  const commitUser = useCallback((next: User | null) => {
+    const prev = userRef.current;
+    const same =
+      prev === next ||
+      (prev !== null &&
+        next !== null &&
+        prev.id === next.id &&
+        prev.email === next.email &&
+        prev.name === next.name);
+    if (same) return;
+    userRef.current = next;
+    setUser(next);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) setUser(mapUser(session.user));
+      commitUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      setUser(session?.user ? mapUser(session.user) : null);
+      commitUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [commitUser]);
 
   const signInEntra = useCallback(async () => {
     if (!ENTRA_ENABLED) {
@@ -67,13 +86,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const handle = username.trim();
     const email = handle.includes('@') ? handle : `${handle}@${BREAK_GLASS_DOMAIN}`;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new Error('Invalid break-glass credentials.');
+    if (error) {
+      console.error('Break-glass sign-in failed:', error);
+      const isBadCredentials =
+        error.status === 400 ||
+        /invalid login credentials|invalid_credentials/i.test(error.message);
+      throw new Error(
+        isBadCredentials
+          ? 'Invalid break-glass credentials.'
+          : 'Sign-in is temporarily unavailable. Please try again.',
+      );
+    }
   }, []);
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
-    setUser(null);
-  }, []);
+    commitUser(null);
+  }, [commitUser]);
 
   return (
     <AuthContext.Provider value={{

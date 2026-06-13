@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useApp } from './AppContext';
+import { useAuth } from './AuthContext';
 import { usePresence } from './PresenceContext';
 import { InputDialog } from './InputDialog';
 import { Avatar } from './ui/Avatar';
@@ -335,6 +336,7 @@ const YouChip: React.FC<{
 export const Sidebar: React.FC<SidebarProps> = ({ mode, onCollapse, onExpand }) => {
   const router = useRouter();
   const { notes, spaces, me, members, openPalette, toggleAccount, closeNav, createSpace, starredCount } = useApp();
+  const { user: authUser } = useAuth();
   const { onlineCount } = usePresence();
   const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
 
@@ -357,7 +359,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode, onCollapse, onExpand }) 
     router.push(href);
   };
 
-  const otherOnline: Member[] = members.filter((m) => m.online && (!me || m.id !== me.id));
+  const otherOnline: Member[] = members.filter((m) => m.online && m.id !== authUser?.id);
   const overflow = Math.max(0, otherOnline.length - 4);
   const overlapAvatars = otherOnline.slice(0, 4);
 

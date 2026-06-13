@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useEditor, EditorContent, Editor } from '@tiptap/react';
+import { useEditor, EditorContent, Editor, NodeViewWrapper, NodeViewContent, ReactNodeViewRenderer, type NodeViewProps } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Collaboration from '@tiptap/extension-collaboration';
+import Collaboration, { isChangeOrigin } from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import Placeholder from '@tiptap/extension-placeholder';
 import TaskList from '@tiptap/extension-task-list';
@@ -10,14 +10,52 @@ import Image from '@tiptap/extension-image';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
 import * as Y from 'yjs';
-import { Bold, ListChecks, Code2, ImageIcon, Paperclip } from 'lucide-react';
+import { Bold, ListChecks, Code2, ImageIcon, Paperclip, Copy as CopyIcon, Check } from 'lucide-react';
 import { createClient } from '../lib/supabase/client';
 import { SupabaseYjsProvider, SyncStatus } from '../lib/yjs/SupabaseProvider';
 import { saveNoteSnapshot, uploadNoteImage } from '../lib/api';
+import { useToast } from './Toast';
 import type { Note, Member } from '../lib/types';
 
 const supabase = createClient();
 const lowlight = createLowlight(common);
+
+// Code-block node view: reference header (window dots + language + Copy) around
+// the highlighted <pre>. Copy reads the node's text to the clipboard.
+const CodeBlockView: React.FC<NodeViewProps> = ({ node }) => {
+  const [copied, setCopied] = useState(false);
+  const lang = (node.attrs.language as string) || 'text';
+  const copy = () => {
+    navigator.clipboard.writeText(node.textContent).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  };
+  return (
+    <NodeViewWrapper style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.09)', margin: '0 0 22px', background: 'rgba(8,11,18,0.6)' }}>
+      <div contentEditable={false} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)', userSelect: 'none' }}>
+        <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#fb87a4' }} />
+        <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#fbbf72' }} />
+        <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#5eead4' }} />
+        <span className="cb-mono" style={{ marginLeft: 8, fontSize: 11, color: '#7c8aa0' }}>{lang}</span>
+        <button
+          type="button" onClick={copy} contentEditable={false} aria-label="Copy code"
+          className="cb-mono"
+          style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: copied ? '#5eead4' : '#8b97ab', cursor: 'pointer', padding: '3px 8px', borderRadius: 6, background: 'transparent', border: 'none' }}
+        >
+          {copied ? <Check size={12} /> : <CopyIcon size={12} />}{copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <pre style={{ margin: 0, padding: '15px 16px', overflowX: 'auto', border: 'none', background: 'transparent', borderRadius: 0 }}>
+        <NodeViewContent />
+      </pre>
+    </NodeViewWrapper>
+  );
+};
+
+const CodeBlock = CodeBlockLowlight.extend({
+  addNodeView() { return ReactNodeViewRenderer(CodeBlockView); },
+}).configure({ lowlight });
 
 export interface EditorPeer { id: string; name: string; color: string }
 
@@ -26,7 +64,6 @@ interface NoteEditorProps {
   me: Member;
   editable: boolean;
   onPeersChange?: (peers: EditorPeer[]) => void;
-  onStatusChange?: (status: SyncStatus) => void;
   onAttach?: () => void;
 }
 
@@ -40,10 +77,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = (props) => {
 
   useEffect(() => {
     const ydoc = new Y.Doc();
-    const provider = new SupabaseYjsProvider(supabase, note.id, ydoc, (s) => {
-      setStatus(s);
-      props.onStatusChange?.(s);
-    });
+    const provider = new SupabaseYjsProvider(supabase, note.id, ydoc, setStatus);
     docRef.current = ydoc;
     providerRef.current = provider;
     setReady(true);
@@ -54,7 +88,6 @@ export const NoteEditor: React.FC<NoteEditorProps> = (props) => {
       providerRef.current = null;
       setReady(false);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note.id]);
 
   if (!ready || !docRef.current || !providerRef.current) {
@@ -85,13 +118,17 @@ const EditorInner: React.FC<InnerProps> = ({
 }) => {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const { showToast } = useToast();
+  // Read latest sync status inside the debounced save without re-creating it.
+  const statusRef = useRef(status);
+  useEffect(() => { statusRef.current = status; }, [status]);
 
   const editor = useEditor({
     editable,
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({ undoRedo: false, codeBlock: false }),
-      CodeBlockLowlight.configure({ lowlight }),
+      CodeBlock,
       TaskList,
       TaskItem.configure({ nested: true }),
       Image.configure({ inline: false }),
@@ -117,10 +154,15 @@ const EditorInner: React.FC<InnerProps> = ({
         return false;
       },
     },
-    onUpdate({ editor }) {
-      if (!editable) return;
+    onUpdate({ editor, transaction }) {
+      // Only persist LOCAL edits. Remote Yjs-sync transactions also fire onUpdate;
+      // persisting them would amplify writes across clients and clobber
+      // last_edited_by attribution with a user who didn't make the edit.
+      if (!editable || isChangeOrigin(transaction)) return;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
+        // Don't persist a stale snapshot while offline/unsynced.
+        if (statusRef.current !== 'synced') return;
         saveNoteSnapshot(supabase, note.id, editor.getJSON()).catch(() => {});
       }, 2000);
     },
@@ -131,8 +173,10 @@ const EditorInner: React.FC<InnerProps> = ({
     try {
       const { url } = await uploadNoteImage(supabase, note.id, file);
       editor.chain().focus().setImage({ src: url, alt: file.name }).run();
-    } catch { /* surfaced via parent toast on attach path */ }
-  }, [editor, note.id]);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not insert image.', 'error');
+    }
+  }, [editor, note.id, showToast]);
 
   // Seed the shared doc from the persisted body exactly once across ALL clients.
   // Gated on a real 'synced' status (so the provider has cold-loaded persisted

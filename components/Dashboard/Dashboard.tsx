@@ -254,7 +254,7 @@ export const Dashboard: React.FC = () => {
                             className="block truncate"
                             style={{ fontSize: 13.5, fontWeight: 700, color: '#dbe2ec' }}
                           >
-                            {n.title}
+                            {n.title || 'Untitled note'}
                           </span>
                           <span
                             className="block font-mono"
@@ -316,7 +316,7 @@ export const Dashboard: React.FC = () => {
                             className="block truncate"
                             style={{ fontSize: 13, fontWeight: 700, color: '#dbe2ec' }}
                           >
-                            {n.title}
+                            {n.title || 'Untitled note'}
                           </span>
                           <span
                             className="block font-mono"

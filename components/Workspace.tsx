@@ -39,6 +39,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ scope, selectedNoteId }) =
 
   const activeChip = scope === 'all' ? parseChip(router.query.filter) : 'all';
   const spaceFilter = firstParam(router.query.space);
+  const [sortKey, setSortKey] = useState<'updated' | 'title'>('updated');
 
   // ── Derived list (mirrors reference renderVals) ─────────────────────
   const visibleNotes = useMemo<Note[]>(() => {
@@ -61,15 +62,13 @@ export const Workspace: React.FC<WorkspaceProps> = ({ scope, selectedNoteId }) =
       else if (activeChip === 'runbooks') base = base.filter((n) => !!n.space && RUNBOOK_SPACE_NAMES.includes(n.space.name));
     }
 
-    // notes arrive updatedAt-desc from the api; float pinned to top for `all`
-    if (scope === 'all') {
-      return [...base].sort((a, b) => {
-        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      });
-    }
-    return base;
-  }, [notes, scope, me, spaceFilter, activeChip]);
+    // Float pinned to top for `all`; then order by the chosen sort key.
+    return [...base].sort((a, b) => {
+      if (scope === 'all' && a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      if (sortKey === 'title') return (a.title || '').localeCompare(b.title || '');
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }, [notes, scope, me, spaceFilter, activeChip, sortKey]);
 
   // /shared and /starred have no [id] route, so selection rides a ?note= query
   // param there; /notes uses the [id] segment (selectedNoteId prop).
@@ -160,11 +159,17 @@ export const Workspace: React.FC<WorkspaceProps> = ({ scope, selectedNoteId }) =
           activeChip={activeChip}
           onChip={onChip}
           onNew={() => void onNew()}
+          sort={sortKey}
+          onToggleSort={() => setSortKey((k) => (k === 'updated' ? 'title' : 'updated'))}
         />
       )}
       {showEditorPane && (
         selectedNote ? (
-          <EditorPane key={selectedNote.id} note={selectedNote} />
+          <EditorPane
+            key={selectedNote.id}
+            note={selectedNote}
+            onBack={() => router.push(basePath, undefined, { shallow: true })}
+          />
         ) : (
           !isMobile && <EmptyEditor />
         )
