@@ -1,125 +1,67 @@
 # CheatBook
 
-An IT team notes app for quickly saving and sharing the things you need to remember — IPs, scripts, how-tos, credentials, links, and any quick reference info. Built for teams that need fast, collaborative note-taking with a dark editorial aesthetic.
+A dark, glassmorphic team-knowledge app for an IT & Engineering org — runbooks, incidents,
+onboarding, and the tribal knowledge you need to remember years later. Real-time collaborative
+block editing with live cursors, organized into colored Spaces.
 
 **Live:** [thecheatbook.vercel.app](https://thecheatbook.vercel.app)
 
-## Tech Stack
+## Tech stack
 
-- **Framework**: Next.js 15 (Pages Router), React 19, TypeScript
-- **Database**: Supabase PostgreSQL with Row Level Security
-- **Auth**: Supabase Auth (email + password with email confirmation)
-- **Real-time**: Supabase Realtime (Presence + Broadcast)
-- **Storage**: Supabase Storage (images, avatars)
-- **Editor**: TinyMCE 8 (self-hosted, GPL) with dark oxide skin
-- **Styling**: Tailwind CSS 3 with dark editorial design system
-- **Typography**: Cormorant Garamond (display), DM Sans (body), JetBrains Mono (code)
+- **Framework**: Next.js 15 (Pages Router), React 19, TypeScript (strict)
+- **Database**: Supabase PostgreSQL with Row Level Security (team-scoped via `profiles.team_id`)
+- **Auth**: Microsoft Entra ID SSO (primary) + break-glass password account — brokered by Supabase Auth
+- **Editor**: TipTap v3 (ProseMirror) block editor bound to **Yjs** (CRDT)
+- **Real-time**: custom Yjs provider over **Supabase Realtime broadcast + presence** (no separate WS server), with CRDT state persisted to `yjs_documents`
+- **Storage**: Supabase Storage (`images`, `avatars`)
+- **Styling**: Tailwind CSS 3, glassmorphic aurora design system
+- **Typography**: Manrope (UI), JetBrains Mono (mono/metadata)
+- **Icons**: lucide-react + inline SVG
 - **Hosting**: Vercel
 
 ## Features
 
-### Team Collaboration
-- **Team system** — Create a team or join one with an invite code
-- **Team-scoped data** — All notebooks and notes shared across the team
-- **Admin controls** — Invite/remove members, toggle admin/member roles
-- **Invite code** — Copy and share, visible on settings page
-- **Real-time editing** — Multiple people can edit the same note simultaneously
-- **Presence indicators** — See who's online and editing
-- **Typing indicators** — See when teammates are typing
+- **Spaces** — colored notebooks (Infrastructure, Runbooks, Onboarding, Incidents, Security, Tribal Knowledge, Network…); filter the list by Space.
+- **Block notes** — TipTap rich text: headings, paragraphs, checklists, code blocks (syntax highlighted), callouts, images, attachments.
+- **Real-time collaboration** — multiple people edit the same note simultaneously; live colored carets + name tags (`CollaborationCaret`), "N editing" presence, "synced" status. Conflict-free via Yjs CRDT.
+- **Live presence** — global online set drives green dots in the sidebar, editor, share panel; derived from the realtime channel, never a DB flag.
+- **Scopes & filters** — All Notes / Shared with me / Starred; chips All / Pinned / Starred / Runbooks (URL-reflected, shareable); per-user stars.
+- **Note actions** — pin, copy link, move to space, duplicate, export to Markdown, version history, delete (confirmed).
+- **Command palette** (⌘K) — backend full-text search across titles/body/tags + quick actions.
+- **Sharing** — invite teammates, per-person Owner/Edit/View, tenant link sharing.
+- **Dashboard** — greeting, live stats, "continue where you left off", stale-knowledge surface, live activity feed.
+- **Settings** — profile + avatar, Entra-managed account, notification prefs (incl. desktop notifications), appearance (accent + density, applied live), active sessions.
+- **Responsive** — full sidebar → icon rail → overlay drawer; mobile single-pane workspace.
 
-### Notes & Editor
-- **TinyMCE rich text editor** — Bold, italic, underline, strikethrough, headings, lists, blockquote, links, images, tables, horizontal rules, clear formatting
-- **Code blocks** — Insert code samples with language selection (codesample plugin)
-- **Paste images** — Paste an image from the clipboard directly into a note
-- **Note locking** — Lock important notes to prevent accidental edits (confirmation to override)
-- **Note pinning** — Pin notes; pinned notes show a pin marker on their note cards
-- **Note hiding** — Hide notes per-user without deleting for the team
-- **Note metadata** — See who created a note and who last edited it
-- **Auto-save** — Changes save automatically every 2 seconds
-- **Ctrl+S** — Manual save keyboard shortcut
-- **Backward compatible** — Old Draft.js JSON content auto-converts to HTML
+## Architecture
 
-### Dashboard & Navigation
-- **Sidebar** — Notebook and note navigation; always visible on desktop, off-canvas (hamburger toggle) on mobile
-- **Dashboard** — Greeting, recent notes grid, activity feed
-- **Command palette** — Cmd+K / Ctrl+K for quick note search
-- **Quick-create** — One click to create a note: auto-creates in your notebook when you have exactly one, shows a picker when you have several, or prompts you to create a notebook first when you have none
-- **Empty state** — With no notes yet, the dashboard prompts you to create your first notebook or note
+- **Pages Router.** App shell = `components/Layout.tsx` (aurora + responsive sidebar + content + global overlays). Provider stack in `pages/_app.tsx`: Auth → Toast → Appearance → Presence → App.
+- **Data layer**: `lib/api.ts` — all Supabase access, mapped into domain types (`lib/types.ts`). Direct client-to-Supabase with RLS as the security boundary (no server API layer).
+- **State**: `components/AppContext.tsx` (members/spaces/notes/activity + overlays + optimistic star/pin + live team subscription), `PresenceContext` (global online set), `AppearanceContext` (accent/density), `AuthContext` (Entra + break-glass).
+- **Realtime**: `lib/yjs/SupabaseProvider.ts` binds a per-note `Y.Doc` + `Awareness` to a Supabase broadcast channel; `components/NoteEditor.tsx` wires TipTap `Collaboration` + `CollaborationCaret`, seeds from the persisted body once, and snapshots the readable body back to the DB on a debounce.
 
-### Settings & Admin
-- **Profile** — Name, avatar upload, email (read-only)
-- **Team management** — View team name, invite code (copy button), member list with roles
-- **Role management** — Admins can click role badges to toggle admin/member
-- **Invite by email** — Add team members directly (they must have an account)
-- **Remove members** — Admin can remove any non-self member
+## Local development
 
-## Pages
+```bash
+npm install
+npm run dev      # http://localhost:3000
+npm run build    # production build + typecheck
+npm run lint
+```
 
-| Route | Description |
-|-------|-------------|
-| `/login` | Cinematic split-screen sign in / sign up |
-| `/team-setup` | Create or join a team (post-signup) |
-| `/` | Dashboard — recent notes, activity feed, sidebar navigation |
-| `/notes/[id]` | Note editor with TinyMCE, real-time collaboration |
-| `/notebooks/[id]` | Notebook listing with note cards |
-| `/search` | Full-page note search |
-| `/profile` | User settings, team management |
+Environment (`.env.local`):
 
-## Getting Started
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+NEXT_PUBLIC_ENTRA_ENABLED=false   # true once Entra SSO is configured
+```
 
-### Prerequisites
+## Authentication setup
 
-- Node.js 22+
-- A Supabase project with the schema applied
+See **[SETUP-ENTRA.md](./SETUP-ENTRA.md)** for the Microsoft Entra ID app-registration steps and
+the break-glass account. Until Entra is configured, sign in via **break-glass** on the login screen.
 
-### Setup
+## Deployment
 
-1. Clone and install:
-   ```bash
-   git clone https://github.com/DustinHannon/CheatBook.git
-   cd CheatBook
-   npm install
-   ```
-
-2. Create `.env.local`:
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   ```
-
-3. Copy TinyMCE assets (if not already present):
-   ```bash
-   cp -r node_modules/tinymce/skins node_modules/tinymce/themes node_modules/tinymce/icons node_modules/tinymce/models node_modules/tinymce/plugins public/tinymce/
-   cp node_modules/tinymce/tinymce.min.js public/tinymce/
-   ```
-
-4. Run:
-   ```bash
-   npm run dev
-   ```
-
-## Database Schema
-
-| Table | Purpose |
-|-------|---------|
-| `profiles` | User data (name, email, avatar, team_id) |
-| `teams` | Teams with invite codes |
-| `team_members` | Team membership with roles (admin/member) |
-| `notebooks` | Note collections scoped to teams |
-| `notes` | HTML content with locking, pinning, versioning, edit tracking |
-| `images` | Note image metadata |
-| `hidden_notes` | Per-user note hiding |
-| `activity_log` | Team action history |
-| `categories` | Team-scoped categories (currently unused in UI) |
-| `note_categories` | Note-category assignments (currently unused in UI) |
-| `collaborators` | Notebook sharing permissions (legacy) |
-
-## RLS Architecture
-
-All RLS policies use `profiles.team_id` for team membership checks — no cross-table recursive policies. This avoids the infinite recursion issues that occur when policies on table A check table B which has policies checking table A.
-
-## License
-
-GPL-3.0 — see [LICENSE](LICENSE). Copyright (C) 2026 Dustin Hannon.
-
-(The project uses self-hosted TinyMCE under its GPL license, so the app is GPL-licensed accordingly.)
+Push to `main` → Vercel auto-deploys. One environment: production.

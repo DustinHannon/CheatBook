@@ -1,143 +1,89 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
 import { createClient } from '../lib/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
-type User = {
-  id: string;
-  email: string;
-  name: string;
-  team_id?: string | null;
-};
+type User = { id: string; email: string; name: string };
 
 type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name?: string) => Promise<void>;
+  entraEnabled: boolean;
+  signInEntra: () => Promise<void>;
+  signInBreakGlass: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  error: string | null;
-  setError: (error: string | null) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isAuthenticated: false,
   isLoading: true,
-  signIn: async () => {},
-  signUp: async () => {},
+  entraEnabled: false,
+  signInEntra: async () => {},
+  signInBreakGlass: async () => {},
   logout: async () => {},
-  error: null,
-  setError: () => {},
 });
 
 const supabase = createClient();
+// Entra SSO is wired through Supabase's Azure OAuth provider. It only lights up
+// once the tenant app registration + provider are configured (see README/SETUP).
+const ENTRA_ENABLED = process.env.NEXT_PUBLIC_ENTRA_ENABLED === 'true';
+const BREAK_GLASS_DOMAIN = 'cheatbook.local';
 
-function mapUser(supabaseUser: SupabaseUser): User {
+function mapUser(u: SupabaseUser): User {
   return {
-    id: supabaseUser.id,
-    email: supabaseUser.email || '',
-    name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || '',
+    id: u.id,
+    email: u.email || '',
+    name: (u.user_metadata?.name as string) || u.email?.split('@')[0] || '',
   };
 }
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user: supabaseUser } }) => {
-      if (supabaseUser) {
-        setUser(mapUser(supabaseUser));
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) setUser(mapUser(session.user));
       setIsLoading(false);
     });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(mapUser(session.user));
-      } else {
-        setUser(null);
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (authError) {
-        throw new Error(authError.message);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'An error occurred';
-      setError(message);
-      throw err;
-    } finally {
-      setIsLoading(false);
+  const signInEntra = useCallback(async () => {
+    if (!ENTRA_ENABLED) {
+      throw new Error('Microsoft Entra SSO is not configured yet. Use a break-glass account below.');
     }
-  };
+    const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined;
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'azure', options: { redirectTo, scopes: 'email openid profile' } });
+    if (error) throw new Error(error.message);
+  }, []);
 
-  const signUp = async (email: string, password: string, name?: string) => {
-    setError(null);
-    setIsLoading(true);
+  const signInBreakGlass = useCallback(async (username: string, password: string) => {
+    const handle = username.trim();
+    const email = handle.includes('@') ? handle : `${handle}@${BREAK_GLASS_DOMAIN}`;
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error('Invalid break-glass credentials.');
+  }, []);
 
-    try {
-      const { error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { name: name || email.split('@')[0] },
-        },
-      });
-      if (authError) {
-        throw new Error(authError.message);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'An error occurred';
-      setError(message);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-    } catch (err) {
-      console.error('Logout failed:', err);
-    }
-  };
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  }, []);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        isLoading,
-        signIn,
-        signUp,
-        logout,
-        error,
-        setError,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user, isAuthenticated: !!user, isLoading,
+      entraEnabled: ENTRA_ENABLED, signInEntra, signInBreakGlass, logout,
+    }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => useContext(AuthContext);
-
 export default AuthContext;

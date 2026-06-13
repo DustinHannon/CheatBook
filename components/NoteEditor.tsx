@@ -1,557 +1,217 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Editor } from '@tinymce/tinymce-react';
-import {
-  CheckIcon,
-  EllipsisHorizontalIcon,
-  LockClosedIcon,
-} from '@heroicons/react/24/outline';
-import UserPresence from './UserPresence';
-import ConfirmDialog from './ConfirmDialog';
-import { useRealtime, getUserColor } from './RealtimeContext';
-import { useAuth } from './AuthContext';
-import { useToast } from './Toast';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useEditor, EditorContent, Editor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Collaboration from '@tiptap/extension-collaboration';
+import CollaborationCaret from '@tiptap/extension-collaboration-caret';
+import Placeholder from '@tiptap/extension-placeholder';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import Image from '@tiptap/extension-image';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { common, createLowlight } from 'lowlight';
+import * as Y from 'yjs';
+import { Bold, ListChecks, Code2, ImageIcon, Paperclip } from 'lucide-react';
 import { createClient } from '../lib/supabase/client';
-import {
-  updateNote as apiUpdateNote,
-  getNote,
-  NoteConflictError,
-  pinNote,
-  unpinNote,
-  lockNote,
-  unlockNote,
-  hideNote,
-} from '../lib/api';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import { SupabaseYjsProvider, SyncStatus } from '../lib/yjs/SupabaseProvider';
+import { saveNoteSnapshot, uploadNoteImage } from '../lib/api';
+import type { Note, Member } from '../lib/types';
 
 const supabase = createClient();
+const lowlight = createLowlight(common);
 
-interface NoteType {
-  id: string;
-  title: string;
-  content: string;
-  updated_at: string;
-  owner_id: string;
-  owner_name?: string;
-  notebook_id: string | null;
-  version?: number;
-  is_locked: boolean;
-  locked_by: string | null;
-  is_pinned: boolean;
-  last_edited_by: string | null;
-  last_edited_by_name?: string;
-}
-
-interface ActiveUser {
-  id: string;
-  name: string;
-  color: string;
-  last_active: Date;
-}
+export interface EditorPeer { id: string; name: string; color: string }
 
 interface NoteEditorProps {
-  note: NoteType | null;
-  onSave?: (note: { id?: string; title: string; content: string }) => void;
-  onDelete?: (noteId: string) => void;
-  onShare?: (noteId: string) => void;
-  onDuplicate?: (noteId: string) => void;
-  /** Upload an image and return its URL (wired to TinyMCE paste/insert). */
-  onImageUpload?: (file: File) => Promise<string>;
-  readOnly?: boolean;
+  note: Note;
+  me: Member;
+  editable: boolean;
+  onPeersChange?: (peers: EditorPeer[]) => void;
+  onStatusChange?: (status: SyncStatus) => void;
+  onAttach?: () => void;
 }
 
-// Convert Draft.js JSON to HTML for backward compatibility
-function draftJsonToHtml(jsonString: string): string {
-  try {
-    const raw = JSON.parse(jsonString);
-    if (!raw || !Array.isArray(raw.blocks)) return jsonString;
+/** Collaborative note body: TipTap + Yjs over Supabase, live carets, autosave. */
+export const NoteEditor: React.FC<NoteEditorProps> = (props) => {
+  const { note } = props;
+  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState<SyncStatus>('connecting');
+  const docRef = useRef<Y.Doc | null>(null);
+  const providerRef = useRef<SupabaseYjsProvider | null>(null);
 
-    const styleMap: Record<string, [string, string]> = {
-      BOLD: ['<strong>', '</strong>'],
-      ITALIC: ['<em>', '</em>'],
-      UNDERLINE: ['<u>', '</u>'],
-      CODE: ['<code>', '</code>'],
-    };
-
-    let html = '';
-    let inList: string | null = null;
-
-    for (const block of raw.blocks) {
-      const text = block.text || '';
-      const type = block.type || 'unstyled';
-
-      // Build styled text
-      let styledText = '';
-      for (let i = 0; i < text.length; i++) {
-        const ch = text[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const activeStyles = (block.inlineStyleRanges || [])
-          .filter((r: any) => i >= r.offset && i < r.offset + r.length)
-          .map((r: any) => r.style);
-
-        let open = '', close = '';
-        for (const s of activeStyles) {
-          const t = styleMap[s];
-          if (!t) continue;
-          const prevActive = (block.inlineStyleRanges || [])
-            .filter((r: any) => (i - 1) >= r.offset && (i - 1) < r.offset + r.length)
-            .map((r: any) => r.style);
-          if (!prevActive.includes(s)) open += t[0];
-          const nextActive = (block.inlineStyleRanges || [])
-            .filter((r: any) => (i + 1) >= r.offset && (i + 1) < r.offset + r.length)
-            .map((r: any) => r.style);
-          if (!nextActive.includes(s)) close = t[1] + close;
-        }
-        styledText += open + ch + close;
-      }
-
-      const isList = type === 'unordered-list-item' || type === 'ordered-list-item';
-      const listTag = type === 'unordered-list-item' ? 'ul' : 'ol';
-
-      if (isList && inList !== listTag) {
-        if (inList) html += `</${inList}>`;
-        html += `<${listTag}>`;
-        inList = listTag;
-      } else if (!isList && inList) {
-        html += `</${inList}>`;
-        inList = null;
-      }
-
-      switch (type) {
-        case 'header-one': html += `<h1>${styledText}</h1>`; break;
-        case 'header-two': html += `<h2>${styledText}</h2>`; break;
-        case 'header-three': html += `<h3>${styledText}</h3>`; break;
-        case 'blockquote': html += `<blockquote>${styledText}</blockquote>`; break;
-        case 'code-block': html += `<pre><code>${styledText}</code></pre>`; break;
-        case 'unordered-list-item':
-        case 'ordered-list-item': html += `<li>${styledText}</li>`; break;
-        default: html += text ? `<p>${styledText}</p>` : '<p><br></p>';
-      }
-    }
-    if (inList) html += `</${inList}>`;
-    return html;
-  } catch {
-    return jsonString || '';
-  }
-}
-
-function parseContent(content: string | null): string {
-  if (!content) return '';
-  try {
-    const parsed = JSON.parse(content);
-    if (parsed && Array.isArray(parsed.blocks)) return draftJsonToHtml(content);
-  } catch { /* not JSON */ }
-  return content;
-}
-
-function relativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return 'just now';
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  return `${Math.floor(hr / 24)}d ago`;
-}
-
-const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare, onDuplicate, onImageUpload, readOnly = false }) => {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [saveStatus, setSaveStatus] = useState<'unsaved' | 'saving' | 'saved' | 'error'>('saved');
-  const [docVersion, setDocVersion] = useState(1);
-  const [localChanges, setLocalChanges] = useState(false);
-  const [typingUsers, setTypingUsers] = useState<ActiveUser[]>([]);
-  const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
-  const [isPinned, setIsPinned] = useState(false);
-  const [isLocked, setIsLocked] = useState(false);
-  const [overrideLock, setOverrideLock] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const { user } = useAuth();
-  const { joinNote, leaveNote } = useRealtime();
-  const { showToast } = useToast();
-
-  const editorRef = useRef<any>(null);
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  const isRemoteUpdate = useRef(false);
-  const contentRef = useRef(content);
-  contentRef.current = content;
-
-  // Latest-value refs so handlers registered once (realtime, timers) read fresh
-  // state without re-binding and without stale closures.
-  const titleRef = useRef(title);
-  titleRef.current = title;
-  const saveStatusRef = useRef(saveStatus);
-  saveStatusRef.current = saveStatus;
-  const docVersionRef = useRef(docVersion);
-  docVersionRef.current = docVersion;
-  const lastTypingSentRef = useRef(0);
-  const typingStopTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isSavingRef = useRef(false);
-  // Assigned after handleSave is defined (placeholders avoid a TDZ cycle).
-  const handleSaveRef = useRef<() => void>(() => {});
-  const flushSaveRef = useRef<() => void>(() => {});
-
-  const effectiveReadOnly = readOnly || (isLocked && !overrideLock);
-
-  // Real-time channel
   useEffect(() => {
-    if (!note?.id || !user) return;
-    const channel = joinNote(note.id, user.id, user.name);
-    channelRef.current = channel;
-    setIsConnected(true);
-
-    channel.on('presence', { event: 'sync' }, () => {
-      const state = channel.presenceState();
-      const users: ActiveUser[] = [];
-      for (const [, presences] of Object.entries(state)) {
-        for (const p of presences as any[]) {
-          if (p.user_id !== user.id) {
-            users.push({ id: p.user_id, name: p.user_name, color: p.color, last_active: new Date(p.online_at) });
-          }
-        }
-      }
-      setActiveUsers(users);
+    const ydoc = new Y.Doc();
+    const provider = new SupabaseYjsProvider(supabase, note.id, ydoc, (s) => {
+      setStatus(s);
+      props.onStatusChange?.(s);
     });
-
-    channel.on('broadcast', { event: 'content-change' }, (payload: any) => {
-      const data = payload.payload;
-      if (data.userId === user.id) return;
-      // Ignore stale/older broadcasts.
-      if (typeof data.version === 'number' && data.version <= docVersionRef.current) return;
-      // Don't overwrite the local user's in-progress edits.
-      if (saveStatusRef.current === 'unsaved' || saveStatusRef.current === 'saving') return;
-      isRemoteUpdate.current = true;
-      setContent(data.content || '');
-      if (data.title) setTitle(data.title);
-      setDocVersion(typeof data.version === 'number' ? data.version : docVersionRef.current);
-      setSaveStatus('saved');
-      setLocalChanges(false);
-      if (editorRef.current) editorRef.current.setContent(data.content || '');
-      setTimeout(() => { isRemoteUpdate.current = false; }, 100);
-    });
-
-    channel.on('broadcast', { event: 'typing-status' }, (payload: any) => {
-      const data = payload.payload;
-      if (data.userId === user.id) return;
-      setTypingUsers(prev => {
-        if (data.isTyping) {
-          if (prev.find(u => u.id === data.userId)) return prev;
-          return [...prev, { id: data.userId, name: data.userName, color: getUserColor(data.userId), last_active: new Date() }];
-        }
-        return prev.filter(u => u.id !== data.userId);
-      });
-    });
-
-    return () => { setIsConnected(false); channelRef.current = null; leaveNote(note.id); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [note?.id, user?.id]);
-
-  // Load note content
-  useEffect(() => {
-    if (note) {
-      setTitle(note.title || '');
-      const html = parseContent(note.content);
-      setContent(html);
-      if (editorRef.current) editorRef.current.setContent(html);
-      setDocVersion(note.version || 1);
-      setSaveStatus('saved');
-      setLocalChanges(false);
-      setIsPinned(!!note.is_pinned);
-      setIsLocked(!!note.is_locked);
-      setOverrideLock(false);
-    } else {
-      setTitle(''); setContent(''); setIsPinned(false); setIsLocked(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [note?.id]);
-
-  // Flush a pending save (and stop typing broadcasts) when leaving the note or
-  // unmounting, so edits made within the last debounce window aren't lost.
-  useEffect(() => {
+    docRef.current = ydoc;
+    providerRef.current = provider;
+    setReady(true);
     return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
-      flushSaveRef.current();
+      provider.destroy();
+      ydoc.destroy();
+      docRef.current = null;
+      providerRef.current = null;
+      setReady(false);
     };
-  }, [note?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note.id]);
 
-  const handleSave = async () => {
-    // Skip overlapping saves: a second save with a stale version would 406-conflict
-    // against the first save's own write (spurious self-conflict).
-    if (!note || effectiveReadOnly || isSavingRef.current) return;
-    isSavingRef.current = true;
-    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
-    setSaveStatus('saving');
-    try {
-      // Flush any in-flight image uploads so getContent() never serializes a blob: URL.
-      if (editorRef.current?.uploadImages) {
-        try { await editorRef.current.uploadImages(); } catch { /* fall through; save what we have */ }
-      }
-      // Read latest title/content at save time (avoids stale-closure saves).
-      const currentContent = editorRef.current ? editorRef.current.getContent() : contentRef.current;
-      const currentTitle = titleRef.current;
-      // Optimistic concurrency: guard on the version we last read.
-      const updated = await apiUpdateNote(
-        supabase, note.id,
-        { title: currentTitle, content: currentContent },
-        docVersionRef.current,
-      );
-      channelRef.current?.send({
-        type: 'broadcast', event: 'content-change',
-        payload: { userId: user?.id, content: currentContent, title: currentTitle, version: updated.version },
-      });
-      if (onSave) onSave({ id: note.id, title: currentTitle, content: currentContent });
-      setSaveStatus('saved');
-      setLocalChanges(false);
-      setDocVersion(updated.version ?? docVersionRef.current + 1);
-    } catch (err) {
-      if (err instanceof NoteConflictError) {
-        // Someone else saved first. Reload the latest; guard the programmatic
-        // setContent so it doesn't re-trigger onEditorChange → a spurious re-save.
-        try {
-          const fresh = await getNote(supabase, note.id);
-          const html = parseContent(fresh.content);
-          isRemoteUpdate.current = true;
-          setContent(html);
-          setTitle(fresh.title || '');
-          if (editorRef.current) editorRef.current.setContent(html);
-          setDocVersion(fresh.version || docVersionRef.current);
-          setSaveStatus('saved');
-          setLocalChanges(false);
-          setTimeout(() => { isRemoteUpdate.current = false; }, 100);
-        } catch {
-          setSaveStatus('error');
-        }
-        // Last-write-wins: the local user's unsaved edits were replaced — say so plainly.
-        showToast('Your unsaved changes were replaced by a newer version saved by someone else.', 'error');
-        return;
-      }
-      console.error('Save error:', err);
-      setSaveStatus('error');
-      showToast('Failed to save note.', 'error');
-    } finally {
-      isSavingRef.current = false;
-    }
-  };
-  handleSaveRef.current = handleSave;
-  flushSaveRef.current = () => {
-    if (!note || effectiveReadOnly) return;
-    if (saveStatusRef.current !== 'unsaved') return;
-    handleSaveRef.current();
-  };
-
-  // (Re)arm the 2s autosave debounce on each change so it measures from the
-  // LAST keystroke, not the first.
-  const scheduleSave = useCallback(() => {
-    if (!note || effectiveReadOnly) return;
-    setSaveStatus('unsaved');
-    setLocalChanges(true);
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => { handleSaveRef.current(); }, 2000);
-  }, [note, effectiveReadOnly]);
-
-  // Throttle the "typing" broadcast (leading edge, max 1/1.5s) and send a
-  // trailing "stopped typing" so remote indicators clear.
-  const broadcastTyping = useCallback(() => {
-    const now = Date.now();
-    if (now - lastTypingSentRef.current > 1500) {
-      lastTypingSentRef.current = now;
-      channelRef.current?.send({
-        type: 'broadcast', event: 'typing-status',
-        payload: { userId: user?.id, userName: user?.name, isTyping: true },
-      });
-    }
-    if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
-    typingStopTimerRef.current = setTimeout(() => {
-      channelRef.current?.send({
-        type: 'broadcast', event: 'typing-status',
-        payload: { userId: user?.id, userName: user?.name, isTyping: false },
-      });
-    }, 2000);
-  }, [user?.id, user?.name]);
-
-  const handleEditorChange = useCallback((newContent: string) => {
-    if (isRemoteUpdate.current) return;
-    // TinyMCE manages content internally; just track it for saving.
-    contentRef.current = newContent;
-    scheduleSave();
-    broadcastTyping();
-  }, [scheduleSave, broadcastTyping]);
-
-  const handleTogglePin = async () => {
-    if (!note) return;
-    try { isPinned ? await unpinNote(supabase, note.id) : await pinNote(supabase, note.id); setIsPinned(!isPinned); }
-    catch (err) { console.error(err); showToast('Failed to update pin.', 'error'); }
-    setShowMenu(false);
-  };
-
-  const handleToggleLock = async () => {
-    if (!note) return;
-    try { isLocked ? await unlockNote(supabase, note.id) : await lockNote(supabase, note.id); setIsLocked(!isLocked); setOverrideLock(false); }
-    catch (err) { console.error(err); showToast('Failed to update lock.', 'error'); }
-    setShowMenu(false);
-  };
-
-  const handleHide = async () => {
-    if (!note) return;
-    try { await hideNote(supabase, note.id); showToast('Note hidden.', 'success'); }
-    catch (err) { console.error(err); showToast('Failed to hide note.', 'error'); }
-    setShowMenu(false);
-  };
-
-  const contentStyle = `
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-    body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; line-height: 1.7; color: #e4e4e7; background: #0a0a0b; padding: 0 12px; max-width: 720px; margin: 0 auto; }
-    h1, h2, h3 { font-family: 'Cormorant Garamond', Georgia, serif; color: #fafafa; margin-top: 1.5em; margin-bottom: 0.5em; }
-    h1 { font-size: 1.75rem; font-weight: 600; } h2 { font-size: 1.375rem; font-weight: 500; } h3 { font-size: 1.125rem; font-weight: 500; }
-    p { margin: 0.5em 0; } a { color: #d4a574; }
-    blockquote { border-left: 3px solid #d4a574; padding-left: 1em; margin: 1em 0; color: #a1a1aa; font-style: italic; }
-    pre { font-family: 'JetBrains Mono', monospace; font-size: 0.875rem; background: #18181b; border: 1px solid #27272a; border-radius: 6px; padding: 1em; overflow-x: auto; color: #e4e4e7; }
-    code { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; background: #18181b; border: 1px solid #1f1f23; border-radius: 3px; padding: 0.15em 0.4em; }
-    ul, ol { margin: 0.75em 0; padding-left: 1.5em; } li { margin: 0.25em 0; } li::marker { color: #d4a574; }
-    strong { color: #fafafa; } img { max-width: 100%; border-radius: 6px; margin: 1em 0; }
-    table { border-collapse: collapse; width: 100%; margin: 1em 0; } th, td { border: 1px solid #27272a; padding: 8px 12px; } th { background: #18181b; color: #fafafa; }
-    hr { border: none; border-top: 1px solid rgba(212,165,116,0.3); margin: 2em 0; }
-    ::selection { background: rgba(212,165,116,0.15); color: #fafafa; }
-  `;
+  if (!ready || !docRef.current || !providerRef.current) {
+    return <div className="px-1 py-8 text-sm text-text-3">Connecting to the live document…</div>;
+  }
 
   return (
-    <div className="flex flex-col h-full bg-bg-base relative">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-border-subtle">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 text-xs">
-            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-status-success' : 'bg-status-error'}`} />
-            {saveStatus === 'saved' && <span className="text-text-tertiary flex items-center gap-1"><CheckIcon className="w-3 h-3" /> Saved</span>}
-            {saveStatus === 'saving' && <span className="text-accent animate-pulse">Saving...</span>}
-            {saveStatus === 'unsaved' && <span className="text-text-tertiary">Unsaved</span>}
-            {saveStatus === 'error' && <span className="text-status-error">Error saving</span>}
-          </div>
-          {note && (
-            <span className="text-xs text-text-tertiary hidden sm:inline">
-              {note.owner_name && `Created by ${note.owner_name}`}
-              {note.last_edited_by_name && note.updated_at && <> &middot; Edited by {note.last_edited_by_name} {relativeTime(note.updated_at)}</>}
-            </span>
-          )}
-          {typingUsers.length > 0 && (
-            <span className="text-xs text-text-tertiary italic">
-              {typingUsers.length === 1 ? `${typingUsers[0].name} is typing...` : `${typingUsers.length} typing...`}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {activeUsers.map(u => <UserPresence key={u.id} user={u} size="small" />)}
-          {note && (
-            <div className="relative">
-              <button aria-label="Note actions" onClick={() => setShowMenu(!showMenu)} className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-surface-hover transition-colors">
-                <EllipsisHorizontalIcon className="w-5 h-5" />
-              </button>
-              {showMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 z-50 bg-bg-surface border border-border-default rounded-lg shadow-lg py-1 min-w-[160px] animate-fade-in">
-                    {onShare && <button onClick={() => { onShare(note.id); setShowMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-text-body hover:bg-bg-surface-hover">Share</button>}
-                    {onDuplicate && <button onClick={() => { onDuplicate(note.id); setShowMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-text-body hover:bg-bg-surface-hover">Duplicate</button>}
-                    <button onClick={handleTogglePin} className="w-full text-left px-4 py-2 text-sm text-text-body hover:bg-bg-surface-hover">{isPinned ? 'Unpin note' : 'Pin note'}</button>
-                    <button onClick={handleToggleLock} className="w-full text-left px-4 py-2 text-sm text-text-body hover:bg-bg-surface-hover">{isLocked ? 'Unlock note' : 'Lock note'}</button>
-                    <button onClick={handleHide} className="w-full text-left px-4 py-2 text-sm text-text-body hover:bg-bg-surface-hover">Hide note</button>
-                    {onDelete && (
-                      <><div className="my-1 border-t border-border-subtle" /><button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true); }} className="w-full text-left px-4 py-2 text-sm text-status-error hover:bg-bg-surface-hover">Delete</button></>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+    <EditorInner
+      key={note.id}
+      ydoc={docRef.current}
+      provider={providerRef.current}
+      synced={status !== 'connecting'}
+      status={status}
+      {...props}
+    />
+  );
+};
+
+interface InnerProps extends NoteEditorProps {
+  ydoc: Y.Doc;
+  provider: SupabaseYjsProvider;
+  synced: boolean;
+  status: SyncStatus;
+}
+
+const EditorInner: React.FC<InnerProps> = ({
+  ydoc, provider, status, note, me, editable, onPeersChange, onAttach,
+}) => {
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInput = useRef<HTMLInputElement | null>(null);
+
+  const editor = useEditor({
+    editable,
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({ undoRedo: false, codeBlock: false }),
+      CodeBlockLowlight.configure({ lowlight }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Image.configure({ inline: false }),
+      Placeholder.configure({ placeholder: 'Start writing — or add a block below…' }),
+      Collaboration.configure({ document: ydoc }),
+      CollaborationCaret.configure({
+        provider,
+        user: { name: me.name, color: me.color },
+      }),
+    ],
+    editorProps: {
+      attributes: { class: 'cb-prose max-w-none focus:outline-none' },
+      handlePaste(_view, event) {
+        const files = Array.from(event.clipboardData?.files || []);
+        const img = files.find((f) => f.type.startsWith('image/'));
+        if (img) { void insertImage(img); return true; }
+        return false;
+      },
+      handleDrop(_view, event) {
+        const files = Array.from((event as DragEvent).dataTransfer?.files || []);
+        const img = files.find((f) => f.type.startsWith('image/'));
+        if (img) { event.preventDefault(); void insertImage(img); return true; }
+        return false;
+      },
+    },
+    onUpdate({ editor }) {
+      if (!editable) return;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => {
+        saveNoteSnapshot(supabase, note.id, editor.getJSON()).catch(() => {});
+      }, 2000);
+    },
+  });
+
+  const insertImage = useCallback(async (file: File) => {
+    if (!editor) return;
+    try {
+      const { url } = await uploadNoteImage(supabase, note.id, file);
+      editor.chain().focus().setImage({ src: url, alt: file.name }).run();
+    } catch { /* surfaced via parent toast on attach path */ }
+  }, [editor, note.id]);
+
+  // Seed the shared doc from the persisted body exactly once across ALL clients.
+  // Gated on a real 'synced' status (so the provider has cold-loaded persisted
+  // CRDT state first — never seed while offline) and on a SHARED Yjs flag set in
+  // a transaction, so two concurrent first-openers can't double-seed into the
+  // merged fragment. The flag propagates over the same broadcast channel.
+  useEffect(() => {
+    if (!editor || status !== 'synced') return;
+    const cfg = ydoc.getMap('config');
+    const frag = ydoc.getXmlFragment('default');
+    if (!cfg.get('seeded') && frag.length === 0 && note.body) {
+      ydoc.transact(() => cfg.set('seeded', true));
+      // Re-check emptiness in case content arrived between the guard and the write.
+      if (frag.length === 0) {
+        try { editor.commands.setContent(note.body as object, { emitUpdate: true }); } catch { /* ignore */ }
+      }
+    }
+  }, [editor, status, ydoc, note.body]);
+
+  // Keep ProseMirror editability in sync with the live lock state (note.isLocked
+  // can flip via the realtime team subscription without remounting the editor).
+  useEffect(() => { editor?.setEditable(editable); }, [editor, editable]);
+
+  // Report editing peers (excluding self) to the parent toolbar.
+  useEffect(() => {
+    if (!editor) return;
+    const aw = provider.awareness;
+    const update = () => {
+      const peers: EditorPeer[] = [];
+      aw.getStates().forEach((state, clientId) => {
+        if (clientId === ydoc.clientID) return;
+        const u = (state as { user?: { name?: string; color?: string } }).user;
+        if (u?.name) peers.push({ id: String(clientId), name: u.name, color: u.color || '#6ea8fe' });
+      });
+      onPeersChange?.(peers);
+    };
+    aw.on('change', update);
+    update();
+    return () => { aw.off('change', update); };
+  }, [editor, provider, ydoc, onPeersChange]);
+
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+
+  const ToolBtn: React.FC<{ label: string; active?: boolean; onClick: () => void; children: React.ReactNode }> = ({ label, active, onClick, children }) => (
+    <button
+      type="button" title={label} aria-label={label} onClick={onClick}
+      className="grid h-[30px] w-[30px] place-items-center rounded-lg text-text-3 transition hover:bg-white/[0.06] hover:text-text disabled:opacity-40"
+      style={active ? { background: 'var(--accent-soft)', color: 'var(--accent)' } : undefined}
+      disabled={!editable}
+    >
+      {children}
+    </button>
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <input
+        ref={fileInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) void insertImage(f); e.target.value = ''; }}
+      />
+      <div className="min-h-0 flex-1">
+        <EditorContent editor={editor} />
       </div>
 
-      {/* Lock banner */}
-      {isLocked && !overrideLock && (
-        <div className="bg-accent-muted border border-accent-line rounded-lg px-4 py-3 mx-6 mt-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-text-body">
-            <LockClosedIcon className="w-4 h-4 text-accent" />
-            <span>This note is locked to prevent accidental edits.</span>
-          </div>
-          <button onClick={() => setOverrideLock(true)} className="text-accent hover:text-accent-hover text-sm transition-colors">Edit anyway</button>
+      {/* bottom bar: formatting + live sync status */}
+      <div className="flex items-center gap-2 border-t border-white/[0.06] px-[18px] py-[11px]">
+        <div className="flex gap-[3px]">
+          <ToolBtn label="Bold" active={editor?.isActive('bold')} onClick={() => editor?.chain().focus().toggleBold().run()}><Bold size={16} /></ToolBtn>
+          <ToolBtn label="Checklist" active={editor?.isActive('taskList')} onClick={() => editor?.chain().focus().toggleTaskList().run()}><ListChecks size={16} /></ToolBtn>
+          <ToolBtn label="Code block" active={editor?.isActive('codeBlock')} onClick={() => editor?.chain().focus().toggleCodeBlock().run()}><Code2 size={16} /></ToolBtn>
+          <ToolBtn label="Insert image" onClick={() => fileInput.current?.click()}><ImageIcon size={16} /></ToolBtn>
+          {onAttach && <ToolBtn label="Attach file" onClick={onAttach}><Paperclip size={16} /></ToolBtn>}
         </div>
-      )}
-
-      {/* Editor area */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[780px] mx-auto px-6 md:px-12 pt-8 pb-16">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => { setTitle(e.target.value); scheduleSave(); }}
-            placeholder="Untitled"
-            className="w-full text-display-md bg-transparent border-none outline-none placeholder:text-text-tertiary mb-6"
-            readOnly={effectiveReadOnly}
+        <div className="ml-auto flex items-center gap-2 font-mono text-[10.5px] text-text-4">
+          <span
+            className="h-[6px] w-[6px] rounded-full"
+            style={{ background: status === 'offline' ? '#fb87a4' : '#5eead4', animation: status === 'synced' ? 'cbPulse 1.6s infinite' : undefined }}
           />
-          <ConfirmDialog
-            isOpen={showDeleteConfirm}
-            onClose={() => setShowDeleteConfirm(false)}
-            onConfirm={() => { if (note && onDelete) onDelete(note.id); }}
-            title="Delete note"
-            message="Delete this note for the whole team? This can't be undone."
-            confirmLabel="Delete"
-            confirmVariant="danger"
-          />
-          <Editor
-            licenseKey="gpl"
-            tinymceScriptSrc="/tinymce/tinymce.min.js"
-            onInit={(_evt, editor) => { editorRef.current = editor; }}
-            initialValue={content}
-            disabled={effectiveReadOnly}
-            onEditorChange={handleEditorChange}
-            init={{
-              height: 500,
-              min_height: 400,
-              menubar: false,
-              statusbar: false,
-              branding: false,
-              promotion: false,
-              skin: 'oxide-dark',
-              content_css: 'dark',
-              content_style: contentStyle,
-              toolbar: 'bold italic underline strikethrough | blocks | bullist numlist | blockquote codesample | link image table | hr removeformat',
-              plugins: 'lists link image table code codesample autolink autoresize',
-              autoresize_bottom_margin: 100,
-              block_formats: 'Paragraph=p; Heading 1=h1; Heading 2=h2; Heading 3=h3; Code=pre',
-              placeholder: 'Start writing...',
-              resize: false,
-              toolbar_mode: 'wrap',
-              link_default_target: '_blank',
-              // Upload pasted/inserted images through the app's storage helper and
-              // replace the <img src> with the returned URL (persists via auto-save).
-              automatic_uploads: true,
-              paste_data_images: true,
-              images_upload_handler: (blobInfo: { blob: () => Blob; filename: () => string }) =>
-                new Promise<string>((resolve, reject) => {
-                  if (!onImageUpload) { reject('Image upload is not available.'); return; }
-                  const blob = blobInfo.blob();
-                  const file = new File([blob], blobInfo.filename(), { type: blob.type });
-                  onImageUpload(file)
-                    .then(resolve)
-                    .catch((e: unknown) => {
-                      console.error('Image upload failed:', e);
-                      showToast(e instanceof Error ? e.message : 'Image upload failed.', 'error');
-                      reject('Image upload failed.');
-                    });
-                }),
-              setup: (editor) => {
-                editor.on('keydown', (e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-                    e.preventDefault();
-                    handleSaveRef.current();
-                  }
-                });
-              },
-            }}
-          />
+          {status === 'synced' ? 'All changes saved · synced' : status === 'offline' ? 'Offline · reconnecting…' : 'Syncing…'}
         </div>
       </div>
     </div>
@@ -559,3 +219,4 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onDelete, onShare
 };
 
 export default NoteEditor;
+export type { Editor };

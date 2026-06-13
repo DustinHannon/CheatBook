@@ -1,13 +1,13 @@
 import React from 'react';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { Layout } from '../components/Layout';
-import { Dashboard } from '../components/Dashboard/Dashboard';
+import { Workspace } from '../components/Workspace';
 
-export default function HomePage() {
+export default function StarredPage() {
   return (
     <ProtectedRoute>
       <Layout>
-        <Dashboard />
+        <Workspace scope="starred" />
       </Layout>
     </ProtectedRoute>
   );

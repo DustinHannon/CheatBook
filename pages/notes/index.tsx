@@ -1,16 +1,13 @@
 import React from 'react';
-import { useRouter } from 'next/router';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { Layout } from '../../components/Layout';
 import { Workspace } from '../../components/Workspace';
 
-export default function NoteDetailPage() {
-  const router = useRouter();
-  const id = typeof router.query.id === 'string' ? router.query.id : undefined;
+export default function NotesPage() {
   return (
     <ProtectedRoute>
       <Layout>
-        <Workspace scope="all" selectedNoteId={id} />
+        <Workspace scope="all" />
       </Layout>
     </ProtectedRoute>
   );

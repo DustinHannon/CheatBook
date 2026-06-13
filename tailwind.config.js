@@ -8,75 +8,64 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
-        body: ['"DM Sans"', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', '"Fira Code"', 'monospace'],
+        sans: ['Manrope', 'system-ui', 'sans-serif'],
+        body: ['Manrope', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
       },
       colors: {
-        bg: {
-          base: 'var(--bg-base)',
-          raised: 'var(--bg-raised)',
-          surface: 'var(--bg-surface)',
-          'surface-hover': 'var(--bg-surface-hover)',
-          'surface-active': 'var(--bg-surface-active)',
-          overlay: 'var(--bg-overlay)',
-        },
-        text: {
-          primary: 'var(--text-primary)',
-          body: 'var(--text-body)',
-          secondary: 'var(--text-secondary)',
-          tertiary: 'var(--text-tertiary)',
-          disabled: 'var(--text-disabled)',
-        },
+        bg: 'var(--bg)',
         accent: {
           DEFAULT: 'var(--accent)',
-          hover: 'var(--accent-hover)',
-          muted: 'var(--accent-muted)',
-          line: 'var(--accent-line)',
+          soft: 'var(--accent-soft)',
         },
-        border: {
-          subtle: 'var(--border-subtle)',
-          DEFAULT: 'var(--border-default)',
-          emphasis: 'var(--border-emphasis)',
+        text: {
+          DEFAULT: 'var(--text)',
+          1: 'var(--text)',
+          2: 'var(--text-2)',
+          3: 'var(--text-3)',
+          4: 'var(--text-4)',
         },
-        status: {
-          success: 'var(--status-success)',
-          warning: 'var(--status-warning)',
-          error: 'var(--status-error)',
-          info: 'var(--status-info)',
+        success: 'var(--success)',
+        warning: 'var(--warning)',
+        danger: 'var(--danger)',
+        violet: 'var(--violet)',
+        sky: 'var(--sky)',
+        // Static space accents (data-driven dots/badges also use inline hex)
+        space: {
+          infrastructure: '#6ea8fe',
+          runbooks: '#5eead4',
+          onboarding: '#86efac',
+          incidents: '#fb87a4',
+          security: '#fbbf72',
+          tribal: '#b794f6',
+          network: '#fb87a4',
         },
+      },
+      borderColor: {
+        panel: 'var(--panel-border)',
+      },
+      backgroundImage: {
+        'accent-grad': 'var(--accent-grad)',
+        'panel-grad': 'var(--panel-grad)',
       },
       boxShadow: {
-        sm: 'var(--shadow-sm)',
-        md: 'var(--shadow-md)',
-        lg: 'var(--shadow-lg)',
-        glow: 'var(--shadow-glow)',
-      },
-      spacing: {
-        header: 'var(--header-height)',
-        sidebar: 'var(--sidebar-width)',
-      },
-      transitionTimingFunction: {
-        'ease-out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',
-      },
-      animation: {
-        'fade-in': 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both',
-        'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both',
-        'slide-in-left': 'slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) both',
+        panel: 'var(--panel-inset), var(--panel-shadow)',
       },
       keyframes: {
-        fadeIn: {
-          from: { opacity: '0' },
-          to: { opacity: '1' },
-        },
-        slideUp: {
-          from: { opacity: '0', transform: 'translateY(12px)' },
-          to: { opacity: '1', transform: 'translateY(0)' },
-        },
-        slideInLeft: {
-          from: { opacity: '0', transform: 'translateX(-12px)' },
-          to: { opacity: '1', transform: 'translateX(0)' },
-        },
+        cbUp: { from: { transform: 'translateY(10px)', opacity: '0' }, to: { transform: 'translateY(0)', opacity: '1' } },
+        cbSlide: { from: { transform: 'translateX(40px)' }, to: { transform: 'translateX(0)' } },
+        cbSpin: { to: { transform: 'rotate(360deg)' } },
+        cbOnline: { '0%,100%': { boxShadow: '0 0 0 0 rgba(94,234,212,.5)' }, '50%': { boxShadow: '0 0 0 4px rgba(94,234,212,0)' } },
+        cbPulse: { '0%,100%': { opacity: '.55' }, '50%': { opacity: '1' } },
+        cbAurora: { '0%': { transform: 'translate3d(0,0,0) scale(1)' }, '50%': { transform: 'translate3d(-3%,2%,0) scale(1.08)' }, '100%': { transform: 'translate3d(0,0,0) scale(1)' } },
+      },
+      animation: {
+        'cb-up': 'cbUp .18s ease both',
+        'cb-slide': 'cbSlide .22s ease both',
+        'cb-spin': 'cbSpin .7s linear infinite',
+        'cb-online': 'cbOnline 2.4s infinite',
+        'cb-pulse': 'cbPulse 1.6s infinite',
+        'cb-aurora': 'cbAurora 26s ease-in-out infinite',
       },
     },
   },

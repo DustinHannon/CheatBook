@@ -1,18 +1,21 @@
-import React from 'react';
-import { NextPage } from 'next';
-import Head from 'next/head';
-import Authentication from '../components/Authentication';
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth } from '../components/AuthContext';
+import { LoginCard } from '../components/LoginCard';
+import { AuroraBackground } from '../components/ui/AuroraBackground';
 
-const LoginPage: NextPage = () => {
+export default function LoginPage() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) router.replace('/');
+  }, [isAuthenticated, isLoading, router]);
+
   return (
-    <>
-      <Head>
-        <title>Sign In - CheatBook</title>
-        <meta name="description" content="Sign in to your CheatBook account" />
-      </Head>
-      <Authentication />
-    </>
+    <div className="relative flex min-h-screen w-screen items-center justify-center overflow-x-hidden bg-[#05070b] px-[18px] py-8">
+      <AuroraBackground />
+      <LoginCard />
+    </div>
   );
-};
-
-export default LoginPage;
+}

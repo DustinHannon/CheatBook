@@ -2,126 +2,56 @@ import React, { createContext, useState, useCallback, useContext, useEffect, use
 
 type ToastType = 'success' | 'error' | 'info';
 
-interface Toast {
-  id: string;
-  message: string;
-  type: ToastType;
-  timestamp: number;
-}
+interface ToastItem { id: string; message: string; type: ToastType }
 
-interface ToastContextType {
-  showToast: (message: string, type?: ToastType) => void;
-}
+interface ToastContextType { showToast: (message: string, type?: ToastType) => void }
 
-const ToastContext = createContext<ToastContextType>({
-  showToast: () => {},
-});
+const ToastContext = createContext<ToastContextType>({ showToast: () => {} });
 
-let toastCounter = 0;
+let counter = 0;
+const ACCENT: Record<ToastType, string> = { success: '#5eead4', error: '#fb87a4', info: '#6ea8fe' };
 
 export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-    const timer = timersRef.current.get(id);
-    if (timer) {
-      clearTimeout(timer);
-      timersRef.current.delete(id);
-    }
+  const remove = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+    const t = timers.current.get(id);
+    if (t) { clearTimeout(t); timers.current.delete(id); }
   }, []);
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = `toast-${++toastCounter}`;
-    const toast: Toast = { id, message, type, timestamp: Date.now() };
-
-    setToasts(prev => {
-      const next = [...prev, toast];
-      if (next.length > 5) {
-        const removed = next.shift();
-        if (removed) {
-          const timer = timersRef.current.get(removed.id);
-          if (timer) {
-            clearTimeout(timer);
-            timersRef.current.delete(removed.id);
-          }
-        }
-      }
-      return next;
-    });
-
-    const timer = setTimeout(() => {
-      removeToast(id);
-    }, 3000);
-    timersRef.current.set(id, timer);
-  }, [removeToast]);
+    const id = `t-${++counter}`;
+    setToasts((prev) => [...prev, { id, message, type }].slice(-5));
+    timers.current.set(id, setTimeout(() => remove(id), 3200));
+  }, [remove]);
 
   useEffect(() => {
-    const timers = timersRef.current;
-    return () => {
-      timers.forEach(timer => clearTimeout(timer));
-      timers.clear();
-    };
+    const map = timers.current;
+    return () => { map.forEach((t) => clearTimeout(t)); map.clear(); };
   }, []);
-
-  const borderColorMap: Record<ToastType, string> = {
-    success: 'border-l-status-success',
-    error: 'border-l-status-error',
-    info: 'border-l-accent',
-  };
 
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
-        {toasts.map(toast => (
+      <div className="pointer-events-none fixed bottom-5 right-5 z-[120] flex flex-col gap-2">
+        {toasts.map((t) => (
           <div
-            key={toast.id}
-            className={`
-              pointer-events-auto
-              bg-bg-surface border border-border-default rounded-lg shadow-lg
-              px-4 py-3 text-sm text-text-body
-              border-l-2 ${borderColorMap[toast.type]}
-              animate-slide-in-right
-              max-w-sm w-80
-            `}
-            role="alert"
+            key={t.id} role="alert"
+            className="cb-panel pointer-events-auto flex w-80 max-w-[90vw] items-center justify-between gap-3 rounded-xl px-4 py-3 text-[13px] text-text-2 animate-cb-up"
+            style={{ borderLeft: `2px solid ${ACCENT[t.type]}` }}
           >
-            <div className="flex items-center justify-between gap-2">
-              <span>{toast.message}</span>
-              <button
-                onClick={() => removeToast(toast.id)}
-                className="text-text-tertiary hover:text-text-secondary flex-shrink-0 ml-2"
-                aria-label="Dismiss"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M3 3l8 8M11 3l-8 8" />
-                </svg>
-              </button>
-            </div>
+            <span>{t.message}</span>
+            <button onClick={() => remove(t.id)} aria-label="Dismiss" className="flex-none text-text-4 hover:text-text">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+            </button>
           </div>
         ))}
       </div>
-      <style jsx global>{`
-        @keyframes slideInRight {
-          from {
-            opacity: 0;
-            transform: translateX(100%);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        .animate-slide-in-right {
-          animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
-        }
-      `}</style>
     </ToastContext.Provider>
   );
 };
 
 export const useToast = () => useContext(ToastContext);
-
 export default ToastContext;

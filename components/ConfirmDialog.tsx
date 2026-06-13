@@ -1,111 +1,192 @@
-import React, { useEffect, useCallback, useId } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 
 interface ConfirmDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
+  open: boolean;
   title: string;
-  message: string;
+  message?: string;
   confirmLabel?: string;
-  confirmVariant?: 'danger' | 'default';
+  cancelLabel?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
 }
 
-const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
-  isOpen,
-  onClose,
-  onConfirm,
+// Modal shell values lifted verbatim from the command-palette modal in
+// designideas/design-references/CheatBook.dc.html (lines 523–524).
+const BACKDROP_STYLE: React.CSSProperties = {
+  background: 'rgba(4,6,11,0.6)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
+};
+const PANEL_STYLE: React.CSSProperties = {
+  background: 'linear-gradient(180deg,rgba(26,32,44,0.92),rgba(16,20,30,0.92))',
+  backdropFilter: 'blur(40px) saturate(170%)',
+  WebkitBackdropFilter: 'blur(40px) saturate(170%)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  boxShadow: '0 40px 100px -30px rgba(0,0,0,0.9),inset 0 1px 0 rgba(255,255,255,0.08)',
+};
+
+const FOCUSABLE =
+  'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
+
+/**
+ * Glass confirmation modal: centered over a blurred, dimmed backdrop.
+ * Click-out + Esc cancel. Confirm button is focused on open; focus is trapped.
+ * `danger` turns the confirm button pink (#fb87a4).
+ */
+export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
+  open,
   title,
   message,
   confirmLabel = 'Confirm',
-  confirmVariant = 'default',
+  cancelLabel = 'Cancel',
+  danger = false,
+  onConfirm,
+  onCancel,
 }) => {
-  const titleId = useId();
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const restoreRef = useRef<HTMLElement | null>(null);
+
+  // Focus the confirm button on open; restore focus on close.
+  useEffect(() => {
+    if (!open) return;
+    restoreRef.current = (document.activeElement as HTMLElement) ?? null;
+    const id = requestAnimationFrame(() => confirmRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(id);
+      restoreRef.current?.focus?.();
+    };
+  }, [open]);
+
+  // Esc closes; Tab is trapped within the panel.
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        e.stopPropagation();
+        onCancel();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const panel = panelRef.current;
+      if (!panel) return;
+      const nodes = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (n) => n.offsetParent !== null,
+      );
+      if (nodes.length === 0) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
       }
     },
-    [onClose],
+    [onCancel],
   );
 
-  useEffect(() => {
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isOpen, handleKeyDown]);
+  if (!open) return null;
 
-  if (!isOpen) return null;
-
-  const confirmButtonClass =
-    confirmVariant === 'danger'
-      ? 'bg-status-error text-white rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 transition-opacity'
-      : 'bg-accent text-bg-base rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 transition-opacity';
+  const confirmGrad = danger
+    ? 'linear-gradient(160deg,#ff9bb4,#fb87a4)'
+    : 'linear-gradient(160deg,#7db0ff,#6ea8fe)';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
+    <div
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+      onKeyDown={onKeyDown}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 90,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+        ...BACKDROP_STYLE,
+      }}
+    >
       <div
-        className="absolute inset-0 bg-bg-overlay animate-confirm-fade-in"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={titleId}
-        className="relative bg-bg-surface border border-border-default rounded-xl shadow-lg max-w-sm w-full mx-4 p-6 animate-confirm-scale-in"
+        aria-labelledby="cb-confirm-title"
+        aria-describedby={message ? 'cb-confirm-message' : undefined}
+        className="animate-cb-up"
+        style={{
+          width: 'min(420px,92vw)',
+          borderRadius: 18,
+          overflow: 'hidden',
+          padding: '24px 24px 20px',
+          ...PANEL_STYLE,
+        }}
       >
-        <h3 id={titleId} className="font-semibold text-text-primary text-lg">{title}</h3>
-        <p className="text-sm text-text-secondary mt-2">{message}</p>
-
-        <div className="mt-6 flex gap-3 justify-end">
-          <button
-            onClick={onClose}
-            className="bg-bg-surface-hover text-text-secondary rounded-lg px-4 py-2 text-sm hover:bg-bg-surface-active transition-colors"
+        <h2
+          id="cb-confirm-title"
+          className="font-sans"
+          style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#eef2f8', letterSpacing: '-0.01em' }}
+        >
+          {title}
+        </h2>
+        {message && (
+          <p
+            id="cb-confirm-message"
+            style={{ margin: '10px 0 0', fontSize: 13.5, lineHeight: 1.6, color: '#8b97ab' }}
           >
-            Cancel
+            {message}
+          </p>
+        )}
+        <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              height: 40,
+              minHeight: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 11,
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#cdd6e3',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.09)',
+            }}
+          >
+            {cancelLabel}
           </button>
           <button
-            onClick={() => {
-              onConfirm();
-              onClose();
+            ref={confirmRef}
+            type="button"
+            onClick={onConfirm}
+            style={{
+              flex: 1,
+              height: 40,
+              minHeight: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 11,
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#0a0f1a',
+              background: confirmGrad,
+              border: 'none',
             }}
-            className={confirmButtonClass}
           >
             {confirmLabel}
           </button>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes confirmFadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-        @keyframes confirmScaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        .animate-confirm-fade-in {
-          animation: confirmFadeIn 0.2s ease-out both;
-        }
-        .animate-confirm-scale-in {
-          animation: confirmScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
-        }
-      `}</style>
     </div>
   );
 };

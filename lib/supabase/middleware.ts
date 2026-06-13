@@ -30,7 +30,16 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
-  const isPublic = pathname.startsWith('/login') || pathname.startsWith('/api') || pathname.startsWith('/_next');
+  // Allow the Entra/OAuth return (code in URL) and auth routes through so the
+  // client can exchange the code before the auth-guard redirect fires.
+  const hasOAuthCode = request.nextUrl.searchParams.has('code');
+  const isPublic =
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/api') ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/_next') ||
+    pathname === '/favicon.svg' ||
+    hasOAuthCode;
 
   // Redirect unauthenticated users to login
   if (!user && !isPublic) {

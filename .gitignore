@@ -19,6 +19,10 @@ out
 # Scratch
 /.tmp/
 
+# Design references + build contract — local working material, not app code
+/designideas/
+/BUILD_CONTRACT.md
+
 # Build cache
 tsconfig.tsbuildinfo
 
