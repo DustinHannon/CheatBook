@@ -94,12 +94,16 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
   const prefsSeeded = useRef(false);
   useEffect(() => {
     if (prefsSeeded.current || !me) return;
+    let cancelled = false;
     supabase
       .from('profiles')
       .select('notification_prefs')
       .eq('id', me.id)
       .single()
       .then(({ data, error }) => {
+        // Bail if this effect was torn down (unmount or me changed) before the
+        // read resolved — never set the seed flag or state on a stale run.
+        if (cancelled) return;
         // On a transient read failure, leave the seed flag unset so a later
         // render can retry — don't lock in DEFAULT_PREFS and clobber stored prefs.
         if (error) return;
@@ -107,6 +111,7 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
         const p = data?.notification_prefs as Partial<NotificationPrefs> | null | undefined;
         if (p && typeof p === 'object') setPrefs({ ...DEFAULT_PREFS, ...p });
       });
+    return () => { cancelled = true; };
   }, [me]);
 
   // "All changes saved" teal confirmation.
@@ -147,8 +152,8 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
         height: '100vh',
         width: '100vw',
         overflow: 'hidden',
-        background: '#05070b',
-        color: '#e7ecf3',
+        background: 'var(--bg)',
+        color: 'var(--text)',
         display: 'flex',
         flexDirection: 'column',
         padding: 14,
@@ -182,10 +187,10 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
             flex: '0 0 auto',
             display: 'grid',
             placeItems: 'center',
-            color: '#c7d0de',
+            color: 'var(--text-2)',
             cursor: 'pointer',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.09)',
+            background: 'var(--surface-input)',
+            border: '1px solid var(--hairline)',
           }}
         >
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
@@ -201,7 +206,7 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
             <div
               role="status"
               className="animate-cb-up"
-              style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 700, color: '#5eead4' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 700, color: 'var(--success)' }}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
               All changes saved
@@ -222,7 +227,7 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
               cursor: saving ? 'wait' : 'pointer',
               fontSize: 13,
               fontWeight: 700,
-              color: '#0a0f1a',
+              color: 'var(--text-on-accent)',
               background: 'var(--accent-grad)',
               border: 'none',
               boxShadow: '0 8px 20px -8px rgba(110,168,254,0.8)',
@@ -257,7 +262,7 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
           className="cb-panel cb-settings-nav"
           style={{ display: 'flex', flexDirection: 'column', minHeight: 0, padding: 12, borderRadius: 18 }}
         >
-          <div className="font-mono" style={{ fontSize: 9.5, letterSpacing: '0.14em', color: '#6f7c92', padding: '8px 12px 10px' }}>
+          <div className="font-mono" style={{ fontSize: 9.5, letterSpacing: '0.14em', color: 'var(--text-4)', padding: '8px 12px 10px' }}>
             ACCOUNT
           </div>
           <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }} aria-label="Settings sections">
@@ -284,7 +289,7 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
                     textAlign: 'left',
                     background: 'transparent',
                     border: 'none',
-                    color: active ? '#eef2f8' : '#b6c0d0',
+                    color: active ? 'var(--text-strong)' : 'var(--text-2)',
                   }}
                 >
                   {active && (
@@ -310,8 +315,8 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
               marginTop: 'auto',
               padding: 12,
               borderRadius: 13,
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              background: 'var(--bg-hover)',
+              border: '1px solid var(--hairline)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
@@ -321,10 +326,10 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
                 <Skeleton className="h-[34px] w-[34px] rounded-full" />
               )}
               <div style={{ minWidth: 0, lineHeight: 1.2 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#eef2f8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {effectiveMe?.name || (loading ? '…' : 'You')}
                 </div>
-                <div className="font-mono" style={{ fontSize: 9, color: '#7c8aa0' }}>You · MorganWhiteGroup</div>
+                <div className="font-mono" style={{ fontSize: 9, color: 'var(--text-3)' }}>You · MorganWhiteGroup</div>
               </div>
             </div>
           </div>
@@ -364,15 +369,15 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
 
       {/* Hover/focus affordances kept in CSS to avoid per-element JS state. */}
       <style jsx global>{`
-        .cb-set-back:hover { background: rgba(255,255,255,0.08); }
+        .cb-set-back:hover { background: var(--bg-hover); }
         .cb-set-save:hover:not(:disabled) { filter: brightness(1.07); }
-        .cb-set-navrow:hover { background: rgba(255,255,255,0.05); color: #eef2f8; }
-        .cb-set-ghost:hover:not(:disabled) { background: rgba(255,255,255,0.1); }
-        .cb-set-remove:not(:disabled):hover { color: #fb87a4; background: rgba(251,135,164,0.08); }
+        .cb-set-navrow:hover { background: var(--bg-hover); color: var(--text-strong); }
+        .cb-set-ghost:hover:not(:disabled) { background: var(--bg-hover); }
+        .cb-set-remove:not(:disabled):hover { color: var(--danger); background: rgba(251,135,164,0.08); }
         .cb-set-danger-btn:hover { background: rgba(251,135,164,0.12); }
         .cb-set-signout-others:hover:not(:disabled) { background: rgba(251,135,164,0.1); }
         .cb-set-accent:hover { filter: brightness(1.1); }
-        .cb-set-density:hover { background: rgba(255,255,255,0.06); }
+        .cb-set-density:hover { background: var(--bg-hover); }
         .cb-set-input:focus { border-color: rgba(110,168,254,0.5); }
         @media (max-width: 760px) {
           .cb-settings-body { grid-template-columns: 1fr !important; grid-auto-rows: min-content; overflow-y: auto; }

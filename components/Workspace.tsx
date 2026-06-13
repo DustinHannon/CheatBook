@@ -39,7 +39,22 @@ export const Workspace: React.FC<WorkspaceProps> = ({ scope, selectedNoteId }) =
 
   const activeChip = scope === 'all' ? parseChip(router.query.filter) : 'all';
   const spaceFilter = firstParam(router.query.space);
+  // Persist the sort choice so it survives the remount when switching scope
+  // (all/shared/starred are separate routes — local state would reset otherwise).
   const [sortKey, setSortKey] = useState<'updated' | 'title'>('updated');
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('cb-note-sort');
+      if (saved === 'title' || saved === 'updated') setSortKey(saved);
+    } catch { /* private mode */ }
+  }, []);
+  const toggleSort = useCallback(() => {
+    setSortKey((k) => {
+      const next = k === 'updated' ? 'title' : 'updated';
+      try { window.localStorage.setItem('cb-note-sort', next); } catch { /* private mode */ }
+      return next;
+    });
+  }, []);
 
   // ── Derived list (mirrors reference renderVals) ─────────────────────
   const visibleNotes = useMemo<Note[]>(() => {
@@ -160,7 +175,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ scope, selectedNoteId }) =
           onChip={onChip}
           onNew={() => void onNew()}
           sort={sortKey}
-          onToggleSort={() => setSortKey((k) => (k === 'updated' ? 'title' : 'updated'))}
+          onToggleSort={toggleSort}
         />
       )}
       {showEditorPane && (
@@ -191,7 +206,7 @@ const WorkspaceGridVars: React.FC = () => (
 const EmptyEditor: React.FC = () => (
   <section className="cb-panel flex min-h-0 flex-col items-center justify-center gap-[14px] text-center" style={{ borderRadius: 20, padding: 40 }}>
     <div
-      className="grid place-items-center border border-white/[0.08] bg-white/[0.04] text-text-4"
+      className="grid place-items-center border border-hairline bg-hover text-text-4"
       style={{ width: 60, height: 60, borderRadius: 18 }}
     >
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2.5" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>

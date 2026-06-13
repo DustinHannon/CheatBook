@@ -81,14 +81,14 @@ export const SecuritySection: React.FC<SecuritySectionProps> = ({ supabase }) =>
           padding: 15,
           borderRadius: 14,
           marginBottom: 24,
-          background: 'rgba(251,191,114,0.06)',
-          border: '1px solid rgba(251,191,114,0.2)',
+          background: 'var(--warning-soft)',
+          border: '1px solid var(--warning-edge)',
         }}
       >
-        <svg width="18" height="18" style={{ flex: '0 0 auto', marginTop: 1 }} viewBox="0 0 24 24" fill="none" stroke="#fbbf72" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l8 4v5c0 5-3.4 8.5-8 11-4.6-2.5-8-6-8-11V6z" /><path d="M9.5 12.5l1.8 1.8 3.5-3.6" /></svg>
+        <svg width="18" height="18" style={{ flex: '0 0 auto', marginTop: 1 }} viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l8 4v5c0 5-3.4 8.5-8 11-4.6-2.5-8-6-8-11V6z" /><path d="M9.5 12.5l1.8 1.8 3.5-3.6" /></svg>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#e0d5be' }}>Break-glass access enabled</div>
-          <div style={{ fontSize: 11.5, color: '#bfae8c', marginTop: 2, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--warning)' }}>Break-glass access enabled</div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-2)', marginTop: 2, lineHeight: 1.5 }}>
             You can use the emergency account if Entra ID is down. Last used: never. All uses are audit-logged.
           </div>
         </div>
@@ -97,14 +97,14 @@ export const SecuritySection: React.FC<SecuritySectionProps> = ({ supabase }) =>
       {/* active sessions */}
       <Eyebrow style={{ marginBottom: 10 }}>ACTIVE SESSIONS</Eyebrow>
       <RowList style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 16px', background: 'rgba(255,255,255,0.025)' }}>
-          <svg width="18" height="18" style={{ color: '#6ea8fe', flex: '0 0 auto' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 16px', background: 'var(--bg-hover)' }}>
+          <svg width="18" height="18" style={{ color: 'var(--accent)', flex: '0 0 auto' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#eef2f8' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
               {device}
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#5eead4', marginLeft: 5 }}>THIS DEVICE</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--success)', marginLeft: 5 }}>THIS DEVICE</span>
             </div>
-            <div className="font-mono" style={{ fontSize: 10, color: '#7c8aa0', marginTop: 2 }}>
+            <div className="font-mono" style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 2 }}>
               {signedInAt ? `Signed in ${new Date(signedInAt).toLocaleString()}` : 'Active now'}
             </div>
           </div>
@@ -126,9 +126,9 @@ export const SecuritySection: React.FC<SecuritySectionProps> = ({ supabase }) =>
           cursor: busy ? 'wait' : 'pointer',
           fontSize: 12.5,
           fontWeight: 700,
-          color: '#fb87a4',
+          color: 'var(--danger)',
           background: 'transparent',
-          border: '1px solid rgba(251,135,164,0.35)',
+          border: '1px solid var(--danger-edge)',
           opacity: busy ? 0.7 : 1,
         }}
       >

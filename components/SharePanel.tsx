@@ -235,7 +235,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
         position: 'fixed', inset: 0, zIndex: 50,
-        background: 'rgba(4,6,11,0.55)',
+        background: 'var(--backdrop)',
         backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
         display: 'flex', justifyContent: 'flex-end',
       }}
@@ -252,12 +252,12 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
           animation: 'cbSlide .22s ease',
           background: 'linear-gradient(180deg,rgba(24,30,42,0.94),rgba(14,18,28,0.96))',
           backdropFilter: 'blur(40px) saturate(170%)', WebkitBackdropFilter: 'blur(40px) saturate(170%)',
-          borderLeft: '1px solid rgba(255,255,255,0.12)',
+          borderLeft: '1px solid var(--modal-border)',
           boxShadow: '-40px 0 100px -30px rgba(0,0,0,0.9)',
         }}
       >
         {/* Header */}
-        <div style={{ padding: '22px 22px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ padding: '22px 22px 18px', borderBottom: '1px solid var(--hairline)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6ea8fe" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="6" cy="12" r="2.4" /><circle cx="18" cy="6" r="2.4" /><circle cx="18" cy="18" r="2.4" />
@@ -268,7 +268,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
               type="button"
               onClick={onClose}
               aria-label="Close share panel"
-              className="grid place-items-center text-text-3 hover:bg-white/[0.07] hover:text-text"
+              className="grid place-items-center text-text-3 hover:bg-hover-2 hover:text-text"
               style={{ width: 30, height: 30, borderRadius: 9, cursor: 'pointer' }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
@@ -291,7 +291,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
               className="cb-invite-input text-text font-body"
               style={{
                 flex: 1, height: 40, padding: '0 14px', borderRadius: 11,
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                background: 'var(--surface-input)', border: '1px solid var(--hairline)',
                 outline: 'none', fontSize: 13,
               }}
             />
@@ -302,7 +302,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 minHeight: 40, height: 40, padding: '0 14px', borderRadius: 11,
-                fontSize: 12.5, fontWeight: 700, color: '#0a0f1a',
+                fontSize: 12.5, fontWeight: 700, color: 'var(--text-on-accent)',
                 background: 'var(--accent-grad)',
                 cursor: email.trim() && !inviting ? 'pointer' : 'not-allowed',
                 opacity: email.trim() && !inviting ? 1 : 0.6,
@@ -334,7 +334,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
               </svg>
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#dbe2ec' }}>Anyone at MorganWhiteGroup</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)' }}>Anyone at MorganWhiteGroup</div>
               <div style={{ fontSize: 11, marginTop: 2 }} className="text-text-3">with the link can view</div>
             </div>
             <button
@@ -347,7 +347,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
               style={{
                 width: 44, height: 26, borderRadius: 20, cursor: loading ? 'default' : 'pointer',
                 position: 'relative', transition: 'background .15s', padding: 0, border: 'none',
-                background: linkOn ? 'var(--accent)' : 'rgba(255,255,255,0.12)',
+                background: linkOn ? 'var(--accent)' : 'var(--border-strong)',
               }}
             >
               <span
@@ -360,7 +360,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
           </div>
 
           {/* People with access */}
-          <div style={{ fontSize: 10, letterSpacing: '0.1em', color: '#6f7c92', marginBottom: 10 }} className="font-mono">
+          <div style={{ fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-4)', marginBottom: 10 }} className="font-mono">
             PEOPLE WITH ACCESS
           </div>
 
@@ -391,7 +391,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
                 return (
                   <li
                     key={row.userId}
-                    className="hover:bg-white/[0.04]"
+                    className="hover:bg-hover"
                     style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 6px', borderRadius: 11 }}
                   >
                     <div style={{ position: 'relative' }}>
@@ -400,7 +400,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
                         style={{
                           width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center',
                           fontSize: 11, fontWeight: 700, color: row.member.color, background: tokenBg,
-                          border: '1.5px solid #0c1119', overflow: 'hidden',
+                          border: '1.5px solid var(--surface-raised)', overflow: 'hidden',
                         }}
                       >
                         {row.member.avatarUrl ? (
@@ -414,17 +414,17 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
                         <span
                           style={{
                             position: 'absolute', bottom: 0, right: 0, width: 9, height: 9, borderRadius: '50%',
-                            background: '#5eead4', border: '2px solid #14182a',
+                            background: 'var(--success)', border: '2px solid #14182a',
                           }}
                         />
                       )}
                     </div>
 
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#e7ecf3' }} className="truncate">
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }} className="truncate">
                         {row.member.name}{row.isYou ? ' (you)' : ''}
                       </div>
-                      <div style={{ fontSize: 11, color: '#7c8aa0' }} className="truncate">{row.member.role}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)' }} className="truncate">{row.member.role}</div>
                     </div>
 
                     {/* Permission dropdown */}
@@ -439,8 +439,8 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
                         style={{
                           display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600,
                           color: '#9aa6ba', padding: '5px 10px', borderRadius: 8, cursor: 'pointer', minHeight: 28,
-                          background: 'rgba(255,255,255,0.04)',
-                          border: menuOpen ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(255,255,255,0.07)',
+                          background: 'var(--surface-input)',
+                          border: menuOpen ? '1px solid var(--border-strong)' : '1px solid var(--hairline)',
                         }}
                       >
                         {PERMISSION_LABEL[row.permission]}
@@ -466,7 +466,7 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
                                 <button
                                   type="button"
                                   onClick={() => handlePermission(row.userId, opt.value)}
-                                  className="hover:bg-white/[0.06]"
+                                  className="hover:bg-hover"
                                   style={{
                                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                                     width: '100%', minHeight: 34, padding: '7px 10px', borderRadius: 8,
@@ -491,12 +491,12 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
                                 type="button"
                                 onClick={() => handleRemove(row.userId)}
                                 aria-label={`Remove access for ${row.member.name}`}
-                                className="hover:bg-white/[0.06]"
+                                className="hover:bg-hover"
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: 8,
                                   width: '100%', minHeight: 34, padding: '7px 10px', borderRadius: 8,
                                   marginTop: 4, paddingTop: 9,
-                                  border: 'none', borderTop: '1px solid rgba(255,255,255,0.07)',
+                                  border: 'none', borderTop: '1px solid var(--hairline)',
                                   fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
                                   color: '#ff8fa3', background: 'transparent',
                                   textAlign: 'left',
@@ -520,15 +520,15 @@ export const SharePanel: React.FC<{ noteId: string; open: boolean; onClose: () =
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '16px 22px', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', gap: 10 }}>
+        <div style={{ padding: '16px 22px', borderTop: '1px solid var(--hairline)', display: 'flex', gap: 10 }}>
           <button
             type="button"
             onClick={handleCopyLink}
-            className="hover:bg-white/[0.09]"
+            className="hover:bg-hover-2"
             style={{
               flex: 1, minHeight: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
               gap: 8, borderRadius: 11, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#cdd6e3',
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
+              background: 'var(--bg-hover)', border: '1px solid var(--hairline)',
             }}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">

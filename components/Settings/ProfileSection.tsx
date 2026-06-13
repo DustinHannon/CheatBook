@@ -83,7 +83,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
           gap: 20,
           paddingBottom: 26,
           marginBottom: 26,
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          borderBottom: '1px solid var(--hairline)',
         }}
       >
         <input
@@ -132,7 +132,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                 background: 'rgba(8,11,18,0.55)',
                 fontSize: 10,
                 fontWeight: 700,
-                color: '#cdd6e3',
+                color: 'var(--text-2)',
               }}
             >
               Drop
@@ -140,8 +140,8 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
           )}
         </button>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#eef2f8', marginBottom: 3 }}>Profile photo</div>
-          <div style={{ fontSize: 12, color: '#8b97ab', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-strong)', marginBottom: 3 }}>Profile photo</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>
             Drag an image onto the circle, or click it to browse. PNG or JPG, up to 5MB.
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -161,9 +161,9 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                 cursor: 'pointer',
                 fontSize: 12.5,
                 fontWeight: 700,
-                color: '#dbe2ec',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                color: 'var(--text-2)',
+                background: 'var(--bg-hover)',
+                border: '1px solid var(--border-strong)',
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14" /></svg>
@@ -184,7 +184,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                 cursor: me.avatarUrl ? 'pointer' : 'not-allowed',
                 fontSize: 12.5,
                 fontWeight: 600,
-                color: '#9aa6ba',
+                color: 'var(--text-3)',
                 background: 'transparent',
                 border: 'none',
                 opacity: me.avatarUrl ? 1 : 0.5,
@@ -227,19 +227,19 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
         >
           <Avatar name={fields.name} color={me.color} avatarUrl={me.avatarUrl} size={44} online />
           <div style={{ minWidth: 0, lineHeight: 1.3 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#eef2f8' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>
               {fields.name || 'Unnamed'}{' '}
               {fields.pronouns && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#8b97ab' }}>{fields.pronouns}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)' }}>{fields.pronouns}</span>
               )}
             </div>
             {(fields.title || fields.team) && (
-              <div style={{ fontSize: 12, color: '#9bbcf2' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
                 {[fields.title, fields.team].filter(Boolean).join(' · ')}
               </div>
             )}
             {fields.status && (
-              <div style={{ fontSize: 11.5, color: '#8b97ab', marginTop: 2 }}>{fields.status}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2 }}>{fields.status}</div>
             )}
           </div>
         </div>

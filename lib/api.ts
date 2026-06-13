@@ -93,12 +93,45 @@ export async function getSpaces(supabase: DB, teamId: string): Promise<Space[]> 
 export async function createSpace(supabase: DB, name: string, color = '#6ea8fe'): Promise<Space> {
   const user = await getCurrentUser(supabase);
   const teamId = await getUserTeamId(supabase);
+  // New spaces sort after the current max so they land at the bottom of the list.
+  const { data: last } = await supabase
+    .from('notebooks').select('sort_order').eq('team_id', teamId)
+    .order('sort_order', { ascending: false }).limit(1).maybeSingle();
+  const sortOrder = (last?.sort_order ?? 0) + 1;
   const { data, error } = await supabase
     .from('notebooks')
-    .insert({ title: name, owner_id: user.id, team_id: teamId, color })
+    .insert({ title: name, owner_id: user.id, team_id: teamId, color, sort_order: sortOrder })
     .select().single();
   if (error) throw error;
   return { id: data.id, name: data.title, color: data.color, icon: data.icon, sortOrder: data.sort_order, noteCount: 0 };
+}
+
+export async function updateSpace(
+  supabase: DB, spaceId: string, updates: { name?: string; color?: string },
+): Promise<void> {
+  const payload: Record<string, unknown> = {};
+  if (updates.name !== undefined) payload.title = updates.name;
+  if (updates.color !== undefined) payload.color = updates.color;
+  if (Object.keys(payload).length === 0) return;
+  const { error } = await supabase.from('notebooks').update(payload).eq('id', spaceId);
+  if (error) throw error;
+}
+
+/**
+ * Delete a space. Notes are FK-bound to notebook_id, so deleting a non-empty
+ * space would error; callers must move/delete its notes first (we surface the
+ * note count in the UI confirmation). Returns the number of notes still in it.
+ */
+export async function getSpaceNoteCount(supabase: DB, spaceId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('notes').select('id', { count: 'exact', head: true }).eq('notebook_id', spaceId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function deleteSpace(supabase: DB, spaceId: string): Promise<void> {
+  const { error } = await supabase.from('notebooks').delete().eq('id', spaceId);
+  if (error) throw error;
 }
 
 // ─── Notes ────────────────────────────────────────────────────────────

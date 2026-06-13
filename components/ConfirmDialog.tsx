@@ -14,16 +14,16 @@ interface ConfirmDialogProps {
 // Modal shell values lifted verbatim from the command-palette modal in
 // designideas/design-references/CheatBook.dc.html (lines 523–524).
 const BACKDROP_STYLE: React.CSSProperties = {
-  background: 'rgba(4,6,11,0.6)',
+  background: 'var(--backdrop)',
   backdropFilter: 'blur(8px)',
   WebkitBackdropFilter: 'blur(8px)',
 };
 const PANEL_STYLE: React.CSSProperties = {
-  background: 'linear-gradient(180deg,rgba(26,32,44,0.92),rgba(16,20,30,0.92))',
+  background: 'var(--modal-grad)',
   backdropFilter: 'blur(40px) saturate(170%)',
   WebkitBackdropFilter: 'blur(40px) saturate(170%)',
-  border: '1px solid rgba(255,255,255,0.12)',
-  boxShadow: '0 40px 100px -30px rgba(0,0,0,0.9),inset 0 1px 0 rgba(255,255,255,0.08)',
+  border: '1px solid var(--modal-border)',
+  boxShadow: 'var(--modal-shadow)',
 };
 
 const FOCUSABLE =
@@ -91,7 +91,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   if (!open) return null;
 
   const confirmGrad = danger
-    ? 'linear-gradient(160deg,#ff9bb4,#fb87a4)'
+    ? 'linear-gradient(160deg,color-mix(in srgb,var(--danger) 80%,#fff),var(--danger))'
     : 'var(--accent-grad)';
 
   return (
@@ -129,14 +129,14 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <h2
           id="cb-confirm-title"
           className="font-sans"
-          style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#eef2f8', letterSpacing: '-0.01em' }}
+          style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}
         >
           {title}
         </h2>
         {message && (
           <p
             id="cb-confirm-message"
-            style={{ margin: '10px 0 0', fontSize: 13.5, lineHeight: 1.6, color: '#8b97ab' }}
+            style={{ margin: '10px 0 0', fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-3)' }}
           >
             {message}
           </p>
@@ -156,9 +156,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               cursor: 'pointer',
               fontSize: 13,
               fontWeight: 700,
-              color: '#cdd6e3',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.09)',
+              color: 'var(--text-2)',
+              background: 'var(--bg-hover)',
+              border: '1px solid var(--hairline)',
             }}
           >
             {cancelLabel}
@@ -178,7 +178,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               cursor: 'pointer',
               fontSize: 13,
               fontWeight: 700,
-              color: '#0a0f1a',
+              color: 'var(--text-on-accent)',
               background: confirmGrad,
               border: 'none',
             }}

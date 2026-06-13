@@ -11,7 +11,7 @@ interface NoteCardProps {
   onSelect: () => void;
 }
 
-const STAR_AMBER = '#fbbf72';
+const STAR_AMBER = 'var(--warning)';
 
 /**
  * One note in the workspace list. Markup lifted verbatim from the note-card
@@ -71,7 +71,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, selected, onSelect }) 
       aria-label={note.title}
       onClick={onSelect}
       onKeyDown={onCardKey}
-      className="group relative flex-none cursor-pointer overflow-hidden border border-white/[0.06] bg-white/[0.028] transition hover:border-white/[0.12] hover:bg-white/[0.055]"
+      className="group relative flex-none cursor-pointer overflow-hidden border border-hairline bg-hover transition hover:border-strong hover:bg-hover-2"
       style={{ padding: '13px 14px', borderRadius: 14 }}
     >
       {selected && (
@@ -113,13 +113,13 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, selected, onSelect }) 
             aria-label={note.starredByMe ? 'Unstar note' : 'Star note'}
             onClick={onToggleStar}
             onKeyDown={onStarKey}
-            className="grid cursor-pointer place-items-center rounded-[7px] hover:bg-white/[0.07]"
+            className="grid cursor-pointer place-items-center rounded-[7px] hover:bg-hover-2"
             style={{ width: 24, height: 24 }}
           >
             <svg
               width="14" height="14" viewBox="0 0 24 24"
               fill={note.starredByMe ? STAR_AMBER : 'none'}
-              stroke={note.starredByMe ? STAR_AMBER : '#6f7c92'}
+              stroke={note.starredByMe ? STAR_AMBER : 'var(--text-4)'}
               strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"
             >
               <path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9z" />
@@ -153,7 +153,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, selected, onSelect }) 
               <div
                 key={m.id}
                 title={m.name}
-                style={{ marginRight: -7, borderRadius: '50%', border: '1.5px solid #0c1119', zIndex: contributors.length - i }}
+                style={{ marginRight: -7, borderRadius: '50%', border: '1.5px solid var(--surface-raised)', zIndex: contributors.length - i }}
               >
                 <Avatar name={m.name} color={m.color} avatarUrl={m.avatarUrl} size={22} ring={false} />
               </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppearance } from '../AppearanceContext';
-import type { Density } from '../../lib/types';
+import type { Density, Theme } from '../../lib/types';
 import { SectionHead, Eyebrow } from './parts';
 
 const ACCENTS = ['#6ea8fe', '#b794f6', '#5eead4', '#fbbf72'] as const;
@@ -10,9 +10,14 @@ const Check: React.FC<{ stroke: string; size?: number; width?: number }> = ({ st
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
 );
 
-/** Appearance: theme cards (Glass Dark active / Light soon), accent swatches, density picker — all live. */
+const THEMES: { key: Theme; label: string; preview: string }[] = [
+  { key: 'dark', label: 'Glass Dark', preview: 'linear-gradient(140deg,#0b0f17,#10151f)' },
+  { key: 'light', label: 'Light', preview: 'linear-gradient(140deg,#ffffff,#e3e8f0)' },
+];
+
+/** Appearance: theme cards (Glass Dark / Light), accent swatches, density picker — all live. */
 export const AppearanceSection: React.FC = () => {
-  const { appearance, setAccent, setDensity } = useAppearance();
+  const { appearance, setAccent, setDensity, setTheme } = useAppearance();
 
   return (
     <>
@@ -23,63 +28,44 @@ export const AppearanceSection: React.FC = () => {
 
       {/* THEME */}
       <Eyebrow style={{ marginBottom: 10 }}>THEME</Eyebrow>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 26 }}>
-        {/* Glass Dark — active */}
-        <div
-          style={{
-            position: 'relative',
-            padding: 14,
-            borderRadius: 14,
-            background: 'rgba(110,168,254,0.08)',
-            border: '1.5px solid rgba(110,168,254,0.5)',
-          }}
-        >
-          <div
-            style={{
-              height: 60,
-              borderRadius: 9,
-              marginBottom: 11,
-              background: 'linear-gradient(140deg,#0b0f17,#10151f)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              boxShadow: 'inset 0 0 22px rgba(70,120,225,0.25)',
-            }}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#eef2f8' }}>Glass Dark</span>
-            <Check stroke="#6ea8fe" size={15} width={2.4} />
-          </div>
-        </div>
-        {/* Light — disabled, SOON */}
-        <div
-          aria-disabled="true"
-          style={{
-            position: 'relative',
-            padding: 14,
-            borderRadius: 14,
-            background: 'rgba(255,255,255,0.025)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            opacity: 0.55,
-          }}
-        >
-          <div
-            style={{
-              height: 60,
-              borderRadius: 9,
-              marginBottom: 11,
-              background: 'linear-gradient(140deg,#e7ecf3,#cdd6e3)',
-              border: '1px solid rgba(255,255,255,0.08)',
-            }}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#cdd6e3' }}>Light</span>
-            <span
-              className="font-mono"
-              style={{ fontSize: 9, color: '#6f7c92', padding: '2px 6px', borderRadius: 5, background: 'rgba(255,255,255,0.06)' }}
+      <div role="radiogroup" aria-label="Theme" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 26 }}>
+        {THEMES.map((t) => {
+          const selected = appearance.theme === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={t.label}
+              onClick={() => setTheme(t.key)}
+              style={{
+                position: 'relative',
+                padding: 14,
+                borderRadius: 14,
+                cursor: 'pointer',
+                textAlign: 'left',
+                background: selected ? 'var(--accent-soft)' : 'var(--bg-hover)',
+                border: selected ? '1.5px solid var(--accent)' : '1px solid var(--hairline)',
+              }}
             >
-              SOON
-            </span>
-          </div>
-        </div>
+              <div
+                style={{
+                  height: 60,
+                  borderRadius: 9,
+                  marginBottom: 11,
+                  background: t.preview,
+                  border: '1px solid var(--hairline)',
+                  boxShadow: t.key === 'dark' ? 'inset 0 0 22px rgba(70,120,225,0.25)' : 'inset 0 0 22px rgba(110,168,254,0.12)',
+                }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-strong)' }}>{t.label}</span>
+                {selected && <Check stroke="var(--accent)" size={15} width={2.4} />}
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* ACCENT */}
@@ -109,9 +95,9 @@ export const AppearanceSection: React.FC = () => {
             >
               {selected && (
                 <>
-                  <span style={{ position: 'absolute', inset: -4, borderRadius: 15, border: '2px solid #fff', opacity: 0.85 }} />
+                  <span style={{ position: 'absolute', inset: -4, borderRadius: 15, border: '2px solid var(--text-strong)', opacity: 0.85 }} />
                   <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
-                    <Check stroke="#0a0f1a" size={18} width={3} />
+                    <Check stroke="var(--text-on-accent)" size={18} width={3} />
                   </span>
                 </>
               )}
@@ -143,9 +129,9 @@ export const AppearanceSection: React.FC = () => {
                 textAlign: 'center',
                 fontSize: 13,
                 fontWeight: 700,
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: '#b6c0d0',
+                background: 'var(--surface-input)',
+                border: '1px solid var(--hairline)',
+                color: 'var(--text-2)',
               }}
             >
               {selected && (
@@ -159,7 +145,7 @@ export const AppearanceSection: React.FC = () => {
                   }}
                 />
               )}
-              <span style={{ position: 'relative', color: selected ? '#eef2f8' : '#b6c0d0' }}>
+              <span style={{ position: 'relative', color: selected ? 'var(--text-strong)' : 'var(--text-2)' }}>
                 {d.charAt(0).toUpperCase() + d.slice(1)}
               </span>
             </button>

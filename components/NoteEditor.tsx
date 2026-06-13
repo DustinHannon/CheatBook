@@ -32,16 +32,16 @@ const CodeBlockView: React.FC<NodeViewProps> = ({ node }) => {
     }).catch(() => {});
   };
   return (
-    <NodeViewWrapper style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.09)', margin: '0 0 22px', background: 'rgba(8,11,18,0.6)' }}>
-      <div contentEditable={false} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)', userSelect: 'none' }}>
-        <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#fb87a4' }} />
-        <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#fbbf72' }} />
-        <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#5eead4' }} />
-        <span className="cb-mono" style={{ marginLeft: 8, fontSize: 11, color: '#7c8aa0' }}>{lang}</span>
+    <NodeViewWrapper style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid var(--hairline)', margin: '0 0 22px', background: 'var(--code-bg)' }}>
+      <div contentEditable={false} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: 'var(--bg-hover)', borderBottom: '1px solid var(--hairline)', userSelect: 'none' }}>
+        <span style={{ width: 11, height: 11, borderRadius: '50%', background: 'var(--danger)' }} />
+        <span style={{ width: 11, height: 11, borderRadius: '50%', background: 'var(--warning)' }} />
+        <span style={{ width: 11, height: 11, borderRadius: '50%', background: 'var(--success)' }} />
+        <span className="cb-mono" style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-4)' }}>{lang}</span>
         <button
           type="button" onClick={copy} contentEditable={false} aria-label="Copy code"
           className="cb-mono"
-          style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: copied ? '#5eead4' : '#8b97ab', cursor: 'pointer', padding: '3px 8px', borderRadius: 6, background: 'transparent', border: 'none' }}
+          style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: copied ? 'var(--success)' : 'var(--text-3)', cursor: 'pointer', padding: '3px 8px', borderRadius: 6, background: 'transparent', border: 'none' }}
         >
           {copied ? <Check size={12} /> : <CopyIcon size={12} />}{copied ? 'Copied' : 'Copy'}
         </button>
@@ -228,7 +228,7 @@ const EditorInner: React.FC<InnerProps> = ({
   const ToolBtn: React.FC<{ label: string; active?: boolean; onClick: () => void; children: React.ReactNode }> = ({ label, active, onClick, children }) => (
     <button
       type="button" title={label} aria-label={label} onClick={onClick}
-      className="grid h-[30px] w-[30px] place-items-center rounded-lg text-text-3 transition hover:bg-white/[0.06] hover:text-text disabled:opacity-40"
+      className="grid h-[30px] w-[30px] place-items-center rounded-lg text-text-3 transition hover:bg-hover hover:text-text disabled:opacity-40"
       style={active ? { background: 'var(--accent-soft)', color: 'var(--accent)' } : undefined}
       disabled={!editable}
     >
@@ -247,7 +247,7 @@ const EditorInner: React.FC<InnerProps> = ({
       </div>
 
       {/* bottom bar: formatting + live sync status */}
-      <div className="flex items-center gap-2 border-t border-white/[0.06] px-[18px] py-[11px]">
+      <div className="flex items-center gap-2 border-t border-hairline px-[18px] py-[11px]">
         <div className="flex gap-[3px]">
           <ToolBtn label="Bold" active={editor?.isActive('bold')} onClick={() => editor?.chain().focus().toggleBold().run()}><Bold size={16} /></ToolBtn>
           <ToolBtn label="Checklist" active={editor?.isActive('taskList')} onClick={() => editor?.chain().focus().toggleTaskList().run()}><ListChecks size={16} /></ToolBtn>
@@ -258,7 +258,7 @@ const EditorInner: React.FC<InnerProps> = ({
         <div className="ml-auto flex items-center gap-2 font-mono text-[10.5px] text-text-4">
           <span
             className="h-[6px] w-[6px] rounded-full"
-            style={{ background: status === 'offline' ? '#fb87a4' : '#5eead4', animation: status === 'synced' ? 'cbPulse 1.6s infinite' : undefined }}
+            style={{ background: status === 'offline' ? 'var(--danger)' : 'var(--success)', animation: status === 'synced' ? 'cbPulse 1.6s infinite' : undefined }}
           />
           {status === 'synced' ? 'All changes saved · synced' : status === 'offline' ? 'Offline · reconnecting…' : 'Syncing…'}
         </div>

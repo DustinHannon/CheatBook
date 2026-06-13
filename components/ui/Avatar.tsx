@@ -46,7 +46,7 @@ export const Avatar: React.FC<AvatarProps> = ({
           className="absolute rounded-full animate-cb-online"
           style={{
             bottom: -1, right: -1, width: pip, height: pip,
-            background: '#5eead4', border: '2px solid #0c1119',
+            background: 'var(--success)', border: '2px solid var(--surface-raised)',
           }}
         />
       )}

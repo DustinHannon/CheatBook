@@ -87,7 +87,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const email = handle.includes('@') ? handle : `${handle}@${BREAK_GLASS_DOMAIN}`;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      console.error('Break-glass sign-in failed:', error);
       const isBadCredentials =
         error.status === 400 ||
         /invalid login credentials|invalid_credentials/i.test(error.message);

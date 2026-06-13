@@ -14,13 +14,16 @@ module.exports = {
       },
       colors: {
         bg: 'var(--bg)',
+        raised: 'var(--surface-raised)',
         accent: {
           DEFAULT: 'var(--accent)',
           soft: 'var(--accent-soft)',
         },
+        ink: 'var(--text-on-accent)',      // text-ink → ink on accent fills
         text: {
           DEFAULT: 'var(--text)',
           1: 'var(--text)',
+          strong: 'var(--text-strong)',
           2: 'var(--text-2)',
           3: 'var(--text-3)',
           4: 'var(--text-4)',
@@ -43,6 +46,14 @@ module.exports = {
       },
       borderColor: {
         panel: 'var(--panel-border)',
+        hairline: 'var(--hairline)',        // replaces raw border-white/[0.0x]
+        strong: 'var(--border-strong)',
+      },
+      backgroundColor: {
+        hover: 'var(--bg-hover)',           // replaces raw hover:bg-white/[0.0x]
+        'hover-2': 'var(--bg-hover-2)',
+        raised: 'var(--surface-raised)',
+        input: 'var(--surface-input)',
       },
       backgroundImage: {
         'accent-grad': 'var(--accent-grad)',

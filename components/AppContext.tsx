@@ -5,7 +5,9 @@ import { usePresence } from './PresenceContext';
 import {
   getCurrentMember, getMembers, getSpaces, getNotes, getActivity,
   getUserTeamId, setStar as apiSetStar, setPinned as apiSetPinned,
-  createNote as apiCreateNote, createSpace as apiCreateSpace, logActivity,
+  createNote as apiCreateNote, createSpace as apiCreateSpace,
+  deleteNote as apiDeleteNote, moveNoteToSpace as apiMoveNote,
+  updateSpace as apiUpdateSpace, deleteSpace as apiDeleteSpace, logActivity,
 } from '../lib/api';
 import type { Member, Space, Note, ActivityEvent } from '../lib/types';
 
@@ -32,10 +34,15 @@ type AppContextType = {
   refreshSpaces: () => Promise<void>;
   refreshActivity: () => Promise<void>;
   refreshMe: () => Promise<void>;
+  refreshMembers: () => Promise<void>;
   toggleStar: (noteId: string) => Promise<void>;
   setPinned: (noteId: string, pinned: boolean) => Promise<void>;
   createNote: (spaceId: string, title?: string) => Promise<Note | null>;
+  deleteNote: (noteId: string) => Promise<boolean>;
+  moveNote: (noteId: string, toSpaceId: string) => Promise<boolean>;
   createSpace: (name: string, color?: string) => Promise<Space | null>;
+  updateSpace: (spaceId: string, updates: { name?: string; color?: string }) => Promise<boolean>;
+  deleteSpace: (spaceId: string) => Promise<boolean>;
   memberById: (id: string) => Member | undefined;
   starredCount: number;
 };
@@ -60,6 +67,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [navOpen, setNavOpen] = useState(false);
 
   const teamIdRef = useRef<string | null>(null);
+  // Mirrors of list state so data ops can read current values without taking
+  // notes/spaces as deps (which would re-create the live-channel effect).
+  const notesRef = useRef<Note[]>([]);
+  const spacesRef = useRef<Space[]>([]);
+  useEffect(() => { notesRef.current = notes; }, [notes]);
+  useEffect(() => { spacesRef.current = spaces; }, [spaces]);
 
   const refreshNotes = useCallback(async () => {
     if (!teamIdRef.current) return;
@@ -75,6 +88,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
   const refreshMe = useCallback(async () => {
     try { setMe(await getCurrentMember(supabase)); } catch { /* keep prior */ }
+  }, []);
+  const refreshMembers = useCallback(async () => {
+    if (!teamIdRef.current) return;
+    try { setRawMembers(await getMembers(supabase, teamIdRef.current)); } catch { /* keep prior */ }
   }, []);
 
   // Initial load on auth.
@@ -115,19 +132,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => { cancelled = true; };
   }, [isAuthenticated, user]);
 
-  // Live team updates: refetch notes + activity on relevant DB changes (debounced).
+  // Live team updates: refetch on relevant DB changes (debounced). A note change
+  // affects BOTH the notes list and per-space note counts, so it refreshes spaces
+  // too. Profile changes refresh members + me so names/avatars/titles stay live.
   useEffect(() => {
     if (!teamId) return;
     let t: ReturnType<typeof setTimeout> | null = null;
-    const bump = () => { if (t) clearTimeout(t); t = setTimeout(() => { refreshNotes(); refreshActivity(); }, 400); };
+    let tp: ReturnType<typeof setTimeout> | null = null;
+    const bumpNotes = () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => { refreshNotes(); refreshSpaces(); refreshActivity(); }, 400);
+    };
+    const bumpProfiles = () => {
+      if (tp) clearTimeout(tp);
+      tp = setTimeout(() => { refreshMembers(); refreshMe(); }, 400);
+    };
     const channel = supabase
       .channel(`cb-team:${teamId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, bump)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, bump)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, bumpNotes)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, () => { if (t) clearTimeout(t); t = setTimeout(() => refreshActivity(), 400); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notebooks' }, () => { refreshSpaces(); })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, bumpProfiles)
       .subscribe();
-    return () => { if (t) clearTimeout(t); supabase.removeChannel(channel); };
-  }, [teamId, refreshNotes, refreshActivity, refreshSpaces]);
+    return () => { if (t) clearTimeout(t); if (tp) clearTimeout(tp); supabase.removeChannel(channel); };
+  }, [teamId, refreshNotes, refreshActivity, refreshSpaces, refreshMembers, refreshMe]);
 
   // Merge live presence into members + me.
   const members = useMemo(
@@ -154,14 +182,59 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     catch { setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, pinned: !pinned } : n))); }
   }, []);
 
+  // Adjust a space's local noteCount so the sidebar tally stays correct the
+  // instant a note is created/deleted/moved, without waiting on a refetch.
+  const bumpSpaceCount = useCallback((spaceId: string | null | undefined, delta: number) => {
+    if (!spaceId) return;
+    setSpaces((prev) => prev.map((s) => (s.id === spaceId ? { ...s, noteCount: Math.max(0, s.noteCount + delta) } : s)));
+  }, []);
+
   const createNote = useCallback(async (spaceId: string, title?: string) => {
     try {
       const note = await apiCreateNote(supabase, spaceId, title);
       setNotes((prev) => [note, ...prev]);
+      bumpSpaceCount(spaceId, +1);
       if (teamIdRef.current) logActivity(supabase, teamIdRef.current, 'created', 'note', note.id, note.title);
       return note;
     } catch { return null; }
-  }, []);
+  }, [bumpSpaceCount]);
+
+  const deleteNote = useCallback(async (noteId: string) => {
+    const target = notesRef.current.find((n) => n.id === noteId);
+    // Optimistic: drop the note + decrement its space count immediately.
+    setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    bumpSpaceCount(target?.spaceId, -1);
+    try {
+      await apiDeleteNote(supabase, noteId);
+      if (teamIdRef.current) logActivity(supabase, teamIdRef.current, 'deleted', 'note', noteId, target?.title ?? null);
+      return true;
+    } catch {
+      // Revert by refetching the authoritative lists.
+      refreshNotes(); refreshSpaces();
+      return false;
+    }
+  }, [bumpSpaceCount, refreshNotes, refreshSpaces]);
+
+  const moveNote = useCallback(async (noteId: string, toSpaceId: string) => {
+    const target = notesRef.current.find((n) => n.id === noteId);
+    const fromSpaceId = target?.spaceId ?? null;
+    if (fromSpaceId === toSpaceId) return true;
+    const toSpace = spacesRef.current.find((s) => s.id === toSpaceId) || null;
+    setNotes((prev) => prev.map((n) => (
+      n.id === noteId
+        ? { ...n, spaceId: toSpaceId, space: toSpace ? { id: toSpace.id, name: toSpace.name, color: toSpace.color } : n.space }
+        : n
+    )));
+    bumpSpaceCount(fromSpaceId, -1);
+    bumpSpaceCount(toSpaceId, +1);
+    try {
+      await apiMoveNote(supabase, noteId, toSpaceId);
+      return true;
+    } catch {
+      refreshNotes(); refreshSpaces();
+      return false;
+    }
+  }, [bumpSpaceCount, refreshNotes, refreshSpaces]);
 
   const createSpace = useCallback(async (name: string, color?: string) => {
     try {
@@ -169,6 +242,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setSpaces((prev) => [...prev, sp].sort((a, b) => a.sortOrder - b.sortOrder));
       return sp;
     } catch { return null; }
+  }, []);
+
+  const updateSpace = useCallback(async (spaceId: string, updates: { name?: string; color?: string }) => {
+    const prev = spacesRef.current.find((s) => s.id === spaceId);
+    // Optimistic local rename/recolor.
+    setSpaces((cur) => cur.map((s) => (s.id === spaceId ? { ...s, ...('name' in updates ? { name: updates.name! } : {}), ...('color' in updates ? { color: updates.color! } : {}) } : s)));
+    try {
+      await apiUpdateSpace(supabase, spaceId, updates);
+      // Notes carry a denormalised space summary (badge color/name) — refresh them
+      // so a recolor/rename reflects on every note card + breadcrumb.
+      refreshNotes();
+      return true;
+    } catch {
+      if (prev) setSpaces((cur) => cur.map((s) => (s.id === spaceId ? prev : s)));
+      return false;
+    }
+  }, [refreshNotes]);
+
+  // Deleting a space CASCADE-deletes its notes (notes_notebook_id_fkey ON DELETE
+  // CASCADE), so drop both the space and its notes locally; revert on failure.
+  const deleteSpace = useCallback(async (spaceId: string) => {
+    const spaceSnapshot = spacesRef.current;
+    const noteSnapshot = notesRef.current;
+    setSpaces((cur) => cur.filter((s) => s.id !== spaceId));
+    setNotes((cur) => cur.filter((n) => n.spaceId !== spaceId));
+    try {
+      await apiDeleteSpace(supabase, spaceId);
+      return true;
+    } catch {
+      setSpaces(spaceSnapshot);
+      setNotes(noteSnapshot);
+      return false;
+    }
   }, []);
 
   const starredCount = useMemo(() => notes.filter((n) => n.starredByMe).length, [notes]);
@@ -183,8 +289,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       closeAccount: () => setAccountOpen(false),
       openNav: () => { setNavOpen(true); setAccountOpen(false); },
       closeNav: () => setNavOpen(false),
-      refreshNotes, refreshSpaces, refreshActivity, refreshMe,
-      toggleStar, setPinned, createNote, createSpace, memberById, starredCount,
+      refreshNotes, refreshSpaces, refreshActivity, refreshMe, refreshMembers,
+      toggleStar, setPinned, createNote, deleteNote, moveNote,
+      createSpace, updateSpace, deleteSpace, memberById, starredCount,
     }}>
       {children}
     </AppContext.Provider>

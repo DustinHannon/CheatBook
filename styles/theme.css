@@ -4,11 +4,19 @@
 
 /* ═══════════════════════════════════════════════════════════════
    CheatBook — Dark, glassmorphic surfaces over an animated aurora.
-   Token values lifted verbatim from the design references.
+   Every surface/text/border color is a semantic token so the app can
+   flip to a Light theme via <html data-theme="light">. The :root values
+   are the DARK theme (lifted verbatim from the design references); the
+   data-theme="light" block overrides them. Accent tokens (--accent*) are
+   set at runtime by AppearanceContext and intentionally NOT overridden
+   per-theme so the user's accent choice survives a theme switch.
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
+  /* ── Surfaces ── */
   --bg: #05070b;
+  --surface-raised: #0c1119;     /* chips, avatar rings, raised inlays */
+  --surface-input: rgba(255, 255, 255, 0.04);
 
   /* Glass panel system */
   --panel-grad: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02));
@@ -16,13 +24,21 @@
   --panel-inset: inset 0 1px 0 rgba(255, 255, 255, 0.07);
   --panel-shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.85);
 
-  /* Accent (runtime-overridable by Appearance settings) */
+  /* Borders + hover overlays */
+  --hairline: rgba(255, 255, 255, 0.07);      /* the common 1px white border */
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-hover-2: rgba(255, 255, 255, 0.07);
+
+  /* Accent (runtime-overridable by Appearance settings via JS) */
   --accent: #6ea8fe;
   --accent-grad: linear-gradient(160deg, #7db0ff, #6ea8fe);
   --accent-soft: rgba(110, 168, 254, 0.16);
+  --text-on-accent: #0a0f1a;                  /* ink on accent-filled buttons */
 
   /* Text ramp */
   --text: #e7ecf3;
+  --text-strong: #eef2f8;                     /* headings / brightest */
   --text-2: #b6c0d0;
   --text-3: #8b97ab;
   --text-4: #6f7c92;
@@ -33,11 +49,110 @@
   --danger: #fb87a4;
   --violet: #b794f6;
   --sky: #7dd3fc;
+  /* Soft status tints for callout/status cards (bg + border) */
+  --success-soft: rgba(94, 234, 212, 0.08);
+  --success-edge: rgba(94, 234, 212, 0.22);
+  --warning-soft: rgba(251, 191, 114, 0.08);
+  --warning-edge: rgba(251, 191, 114, 0.24);
+  --danger-soft: rgba(251, 135, 164, 0.08);
+  --danger-edge: rgba(251, 135, 164, 0.24);
+
+  /* Overlays / modals */
+  --backdrop: rgba(4, 6, 11, 0.6);
+  --modal-grad: linear-gradient(180deg, rgba(26, 32, 44, 0.92), rgba(16, 20, 30, 0.92));
+  --modal-border: rgba(255, 255, 255, 0.12);
+  --modal-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* Code / prose */
+  --code-bg: rgba(8, 11, 18, 0.6);
+  --code-fg: #cfd8e4;
+  --code-inline-fg: #9fd0ff;
+  --code-inline-bg: rgba(255, 255, 255, 0.08);
+
+  /* Chrome */
+  --scrollbar: rgba(255, 255, 255, 0.10);
+  --scrollbar-hover: rgba(255, 255, 255, 0.18);
+  --selection: rgba(110, 168, 254, 0.32);
+  --autofill-fg: #e7ecf3;
+  --autofill-bg: #14181f;
+  --checkbox-border: rgba(255, 255, 255, 0.22);
+  --checkbox-bg: rgba(255, 255, 255, 0.04);
+  --checkbox-ink: #06080d;
+
+  /* Aurora backdrop layers */
+  --aurora-1: rgba(70, 120, 225, 0.22);
+  --aurora-2: rgba(120, 96, 224, 0.16);
+  --aurora-3: rgba(40, 96, 190, 0.20);
+  --aurora-grid: rgba(255, 255, 255, 0.022);
+  --aurora-vignette: rgba(0, 0, 0, 0.55);
 
   /* Density (set on <html data-density>) */
   --density-list-gap: 8px;
   --density-card-pad: 13px 14px;
   --density-editor-pad: 34px 40px 80px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   LIGHT THEME — soft slate-on-paper. Glass becomes frosted white,
+   the aurora becomes a pale wash, text inverts to dark slate.
+   ───────────────────────────────────────────────────────────── */
+html[data-theme="light"] {
+  --bg: #eef1f6;
+  --surface-raised: #ffffff;
+  --surface-input: #ffffff;
+
+  --panel-grad: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.74));
+  --panel-border: rgba(15, 23, 42, 0.10);
+  --panel-inset: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --panel-shadow: 0 20px 48px -30px rgba(15, 23, 42, 0.40);
+
+  --hairline: rgba(15, 23, 42, 0.10);
+  --border-strong: rgba(15, 23, 42, 0.16);
+  --bg-hover: rgba(15, 23, 42, 0.05);
+  --bg-hover-2: rgba(15, 23, 42, 0.08);
+
+  --text: #18202c;
+  --text-strong: #0b1018;
+  --text-2: #45506a;
+  --text-3: #647088;
+  --text-4: #8b96a8;
+
+  --success: #0e9f8e;
+  --warning: #c2790a;
+  --danger: #e0567d;
+  --violet: #8b5cf6;
+  --sky: #0ea5e9;
+  --success-soft: rgba(14, 159, 142, 0.10);
+  --success-edge: rgba(14, 159, 142, 0.30);
+  --warning-soft: rgba(194, 121, 10, 0.10);
+  --warning-edge: rgba(194, 121, 10, 0.30);
+  --danger-soft: rgba(224, 86, 125, 0.10);
+  --danger-edge: rgba(224, 86, 125, 0.30);
+
+  --backdrop: rgba(15, 23, 42, 0.28);
+  --modal-grad: linear-gradient(180deg, #ffffff, #f3f5f9);
+  --modal-border: rgba(15, 23, 42, 0.10);
+  --modal-shadow: 0 30px 70px -30px rgba(15, 23, 42, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  --code-bg: #f3f5f9;
+  --code-fg: #1f2937;
+  --code-inline-fg: #1d4ed8;
+  --code-inline-bg: rgba(15, 23, 42, 0.06);
+
+  --scrollbar: rgba(15, 23, 42, 0.18);
+  --scrollbar-hover: rgba(15, 23, 42, 0.30);
+  --selection: rgba(110, 168, 254, 0.30);
+  --autofill-fg: #18202c;
+  --autofill-bg: #ffffff;
+  --checkbox-border: rgba(15, 23, 42, 0.28);
+  --checkbox-bg: #ffffff;
+  --checkbox-ink: #06080d;
+
+  --aurora-1: rgba(110, 168, 254, 0.20);
+  --aurora-2: rgba(150, 130, 250, 0.15);
+  --aurora-3: rgba(90, 150, 250, 0.16);
+  --aurora-grid: rgba(15, 23, 42, 0.035);
+  --aurora-vignette: rgba(15, 23, 42, 0.06);
 }
 
 html[data-density="compact"] {
@@ -69,21 +184,21 @@ html, body {
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.10);
+  background: var(--scrollbar);
   border-radius: 20px;
   border: 3px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--scrollbar-hover);
   background-clip: padding-box;
 }
-::selection { background: rgba(110, 168, 254, 0.32); }
+::selection { background: var(--selection); }
 
 input, textarea, select, button { font-family: inherit; }
 input:-webkit-autofill {
-  -webkit-text-fill-color: #e7ecf3;
-  -webkit-box-shadow: 0 0 0 40px #14181f inset;
+  -webkit-text-fill-color: var(--autofill-fg);
+  -webkit-box-shadow: 0 0 0 40px var(--autofill-bg) inset;
 }
 
 a { color: inherit; text-decoration: none; }
@@ -143,33 +258,33 @@ a { color: inherit; text-decoration: none; }
 .cb-prose:focus { outline: none; }
 .cb-prose p { margin: 0 0 16px; font-size: 14.5px; line-height: 1.72; color: var(--text-2); }
 .cb-prose h1 { margin: 0 0 12px; font-size: 34px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.12; color: var(--text); }
-.cb-prose h2 { margin: 24px 0 12px; font-size: 19px; font-weight: 800; letter-spacing: -0.02em; color: #eef2f8; }
-.cb-prose h3 { margin: 20px 0 10px; font-size: 16px; font-weight: 700; color: #eef2f8; }
-.cb-prose code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 5px; color: #9fd0ff; }
+.cb-prose h2 { margin: 24px 0 12px; font-size: 19px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-strong); }
+.cb-prose h3 { margin: 20px 0 10px; font-size: 16px; font-weight: 700; color: var(--text-strong); }
+.cb-prose code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; background: var(--code-inline-bg); padding: 1px 6px; border-radius: 5px; color: var(--code-inline-fg); }
 .cb-prose pre {
   margin: 0 0 22px; padding: 14px 16px; border-radius: 13px; overflow-x: auto;
-  font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.8; color: #cfd8e4;
-  background: rgba(8,11,18,0.6); border: 1px solid rgba(255,255,255,0.09);
+  font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.8; color: var(--code-fg);
+  background: var(--code-bg); border: 1px solid var(--hairline);
 }
 .cb-prose pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
 .cb-prose ul[data-type="taskList"] { list-style: none; padding: 0; margin: 0 0 20px; }
 .cb-prose ul[data-type="taskList"] li { display: flex; gap: 12px; align-items: flex-start; padding: 7px 0; }
 .cb-prose ul[data-type="taskList"] li > label { flex: 0 0 auto; margin-top: 1px; user-select: none; }
 .cb-prose ul[data-type="taskList"] li > div { flex: 1; }
-.cb-prose ul[data-type="taskList"] li > div > p { margin: 0; font-size: 14.5px; line-height: 1.5; color: #cfd8e4; }
+.cb-prose ul[data-type="taskList"] li > div > p { margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--code-fg); }
 .cb-prose ul[data-type="taskList"] li[data-checked="true"] > div > p { text-decoration: line-through; color: var(--text-4); }
 .cb-prose ul[data-type="taskList"] input[type="checkbox"] {
   appearance: none; -webkit-appearance: none; width: 21px; height: 21px; border-radius: 6px;
-  border: 1.6px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.04); cursor: pointer; position: relative;
+  border: 1.6px solid var(--checkbox-border); background: var(--checkbox-bg); cursor: pointer; position: relative;
 }
 .cb-prose ul[data-type="taskList"] input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
 .cb-prose ul[data-type="taskList"] input[type="checkbox"]:checked::after {
   content: ''; position: absolute; left: 6px; top: 2px; width: 5px; height: 10px;
-  border: solid #06080d; border-width: 0 3px 3px 0; transform: rotate(45deg);
+  border: solid var(--checkbox-ink); border-width: 0 3px 3px 0; transform: rotate(45deg);
 }
 .cb-prose ul:not([data-type="taskList"]), .cb-prose ol { margin: 0 0 16px; padding-left: 22px; color: var(--text-2); font-size: 14.5px; line-height: 1.72; }
 .cb-prose blockquote { border-left: 3px solid var(--accent); margin: 0 0 16px; padding-left: 14px; color: var(--text-2); }
-.cb-prose img { max-width: 100%; border-radius: 14px; border: 1px solid rgba(255,255,255,0.09); margin: 0 0 10px; }
+.cb-prose img { max-width: 100%; border-radius: 14px; border: 1px solid var(--hairline); margin: 0 0 10px; }
 .cb-prose .is-editor-empty:first-child::before {
   color: var(--text-4); content: attr(data-placeholder); float: left; height: 0; pointer-events: none;
 }

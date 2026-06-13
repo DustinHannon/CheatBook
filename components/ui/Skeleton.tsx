@@ -7,7 +7,7 @@ import React from 'react';
 export const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) => (
   <div
     aria-hidden="true"
-    className={`animate-cb-pulse rounded-lg bg-white/[0.05] ${className}`}
+    className={`animate-cb-pulse rounded-lg bg-hover ${className}`}
   />
 );
 

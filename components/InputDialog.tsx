@@ -14,16 +14,16 @@ interface InputDialogProps {
 // Modal shell values lifted verbatim from the command-palette modal in
 // designideas/design-references/CheatBook.dc.html (lines 523–524).
 const BACKDROP_STYLE: React.CSSProperties = {
-  background: 'rgba(4,6,11,0.6)',
+  background: 'var(--backdrop)',
   backdropFilter: 'blur(8px)',
   WebkitBackdropFilter: 'blur(8px)',
 };
 const PANEL_STYLE: React.CSSProperties = {
-  background: 'linear-gradient(180deg,rgba(26,32,44,0.92),rgba(16,20,30,0.92))',
+  background: 'var(--modal-grad)',
   backdropFilter: 'blur(40px) saturate(170%)',
   WebkitBackdropFilter: 'blur(40px) saturate(170%)',
-  border: '1px solid rgba(255,255,255,0.12)',
-  boxShadow: '0 40px 100px -30px rgba(0,0,0,0.9),inset 0 1px 0 rgba(255,255,255,0.08)',
+  border: '1px solid var(--modal-border)',
+  boxShadow: 'var(--modal-shadow)',
 };
 
 const FOCUSABLE =
@@ -141,7 +141,7 @@ export const InputDialog: React.FC<InputDialogProps> = ({
         <h2
           id="cb-input-title"
           className="font-sans"
-          style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#eef2f8', letterSpacing: '-0.01em' }}
+          style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}
         >
           {title}
         </h2>
@@ -157,7 +157,7 @@ export const InputDialog: React.FC<InputDialogProps> = ({
               fontSize: 10,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
-              color: '#6f7c92',
+              color: 'var(--text-4)',
             }}
           >
             {label}
@@ -177,10 +177,10 @@ export const InputDialog: React.FC<InputDialogProps> = ({
             height: 44,
             padding: '0 14px',
             borderRadius: 11,
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'var(--surface-input)',
+            border: '1px solid var(--hairline)',
             outline: 'none',
-            color: '#eef2f8',
+            color: 'var(--text-strong)',
             fontSize: 14,
             fontFamily: "'Manrope',sans-serif",
           }}
@@ -201,9 +201,9 @@ export const InputDialog: React.FC<InputDialogProps> = ({
               cursor: 'pointer',
               fontSize: 13,
               fontWeight: 700,
-              color: '#cdd6e3',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.09)',
+              color: 'var(--text-2)',
+              background: 'var(--bg-hover)',
+              border: '1px solid var(--hairline)',
             }}
           >
             Cancel
@@ -222,7 +222,7 @@ export const InputDialog: React.FC<InputDialogProps> = ({
               cursor: trimmedEmpty ? 'not-allowed' : 'pointer',
               fontSize: 13,
               fontWeight: 700,
-              color: '#0a0f1a',
+              color: 'var(--text-on-accent)',
               background: 'var(--accent-grad)',
               border: 'none',
               opacity: trimmedEmpty ? 0.5 : 1,

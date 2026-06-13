@@ -41,9 +41,9 @@ const MenuItem = React.forwardRef<HTMLButtonElement, {
   children: React.ReactNode;
 }>(({ danger = false, onClick, children }, ref) => {
   const [hover, setHover] = useState(false);
-  const restColor = danger ? '#fb87a4' : '#c7d0de';
-  const hoverColor = danger ? '#fb87a4' : '#fff';
-  const hoverBg = danger ? 'rgba(251,135,164,0.12)' : 'rgba(255,255,255,0.06)';
+  const restColor = danger ? 'var(--danger)' : 'var(--text-2)';
+  const hoverColor = danger ? 'var(--danger)' : 'var(--text-strong)';
+  const hoverBg = danger ? 'rgba(251,135,164,0.12)' : 'var(--bg-hover)';
   return (
     <button
       ref={ref}
@@ -156,7 +156,7 @@ export const AccountMenu: React.FC = () => {
           background: 'linear-gradient(180deg,rgba(30,36,50,0.98),rgba(18,22,32,0.98))',
           backdropFilter: 'blur(34px) saturate(160%)',
           WebkitBackdropFilter: 'blur(34px) saturate(160%)',
-          border: '1px solid rgba(255,255,255,0.12)',
+          border: '1px solid var(--border-strong)',
           boxShadow: '0 28px 70px -22px rgba(0,0,0,0.92),inset 0 1px 0 rgba(255,255,255,0.07)',
         }}
       >
@@ -168,7 +168,7 @@ export const AccountMenu: React.FC = () => {
               style={{
                 fontSize: 13.5,
                 fontWeight: 700,
-                color: '#eef2f8',
+                color: 'var(--text-strong)',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -180,7 +180,7 @@ export const AccountMenu: React.FC = () => {
               className="cb-mono"
               style={{
                 fontSize: 10,
-                color: '#7c8aa0',
+                color: 'var(--text-3)',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -192,7 +192,7 @@ export const AccountMenu: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '0 2px 4px' }} />
+        <div style={{ height: 1, background: 'var(--hairline)', margin: '0 2px 4px' }} />
 
         <MenuItem ref={firstItemRef} onClick={() => goSettings('profile')}>
           <IconProfile />
@@ -208,7 +208,7 @@ export const AccountMenu: React.FC = () => {
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6ea8fe' }} />
         </MenuItem>
 
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 2px' }} />
+        <div style={{ height: 1, background: 'var(--hairline)', margin: '4px 2px' }} />
 
         <MenuItem danger onClick={handleLogout}>
           <IconLogout />

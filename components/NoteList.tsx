@@ -64,7 +64,7 @@ export const NoteList: React.FC<NoteListProps> = ({
             type="button"
             onClick={openNav}
             aria-label="Open navigation"
-            className="grid flex-none cursor-pointer place-items-center border border-white/[0.08] text-text-2 hover:bg-white/[0.06] md:hidden"
+            className="grid flex-none cursor-pointer place-items-center border border-hairline text-text-2 hover:bg-hover md:hidden"
             style={{ width: 32, height: 32, minWidth: 44, minHeight: 44, borderRadius: 9 }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
@@ -77,8 +77,8 @@ export const NoteList: React.FC<NoteListProps> = ({
               onClick={onToggleSort}
               aria-label={sort === 'title' ? 'Sorted A–Z — click to sort by recently updated' : 'Sorted by recently updated — click to sort A–Z'}
               title={sort === 'title' ? 'Sorted A–Z' : 'Sorted by recently updated'}
-              className="grid cursor-pointer place-items-center border border-white/[0.07] hover:bg-white/[0.05] hover:text-text-1"
-              style={{ width: 30, height: 30, borderRadius: 9, color: sort === 'title' ? 'var(--accent)' : '#8b97ab' }}
+              className="grid cursor-pointer place-items-center border border-hairline hover:bg-hover hover:text-text-1"
+              style={{ width: 30, height: 30, borderRadius: 9, color: sort === 'title' ? 'var(--accent)' : 'var(--text-3)' }}
             >
               {sort === 'title' ? (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 7h10M5 12h7M5 17h4M16 7v10M16 17l3-3M16 17l-3-3" /></svg>
@@ -93,11 +93,11 @@ export const NoteList: React.FC<NoteListProps> = ({
               className="flex cursor-pointer items-center gap-[7px] font-bold hover:brightness-[1.07]"
               style={{
                 height: 30, minHeight: 44, padding: '0 12px', borderRadius: 9, fontSize: 12.5,
-                color: '#0a0f1a', background: 'var(--accent-grad)',
+                color: 'var(--text-on-accent)', background: 'var(--accent-grad)',
                 boxShadow: '0 6px 16px -6px rgba(110,168,254,0.8)',
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0f1a" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>New
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-on-accent)" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>New
             </button>
           </div>
         </div>
@@ -116,9 +116,9 @@ export const NoteList: React.FC<NoteListProps> = ({
                   className="cursor-pointer whitespace-nowrap font-semibold hover:brightness-[1.15]"
                   style={{
                     padding: '6px 12px', borderRadius: 9, fontSize: 12,
-                    color: on ? '#0a0f1a' : '#aeb9ca',
-                    background: on ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${on ? 'var(--accent)' : 'rgba(255,255,255,0.08)'}`,
+                    color: on ? 'var(--text-on-accent)' : 'var(--text-3)',
+                    background: on ? 'var(--accent)' : 'var(--surface-input)',
+                    border: `1px solid ${on ? 'var(--accent)' : 'var(--hairline)'}`,
                   }}
                 >
                   {c.label}
@@ -141,7 +141,7 @@ export const NoteList: React.FC<NoteListProps> = ({
         {isEmpty ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-[14px] text-center" style={{ padding: '48px 30px' }}>
             <div
-              className="grid place-items-center border border-white/[0.08] bg-white/[0.04] text-text-4"
+              className="grid place-items-center border border-hairline bg-input text-text-4"
               style={{ width: 54, height: 54, borderRadius: 16 }}
             >
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9z" /></svg>
@@ -158,7 +158,7 @@ export const NoteList: React.FC<NoteListProps> = ({
                 onSelect={() => onSelect(note.id)}
               />
             ))}
-            <div className="font-mono" style={{ textAlign: 'center', padding: '14px 0 4px', fontSize: 10.5, color: '#5d6a7e' }}>
+            <div className="font-mono" style={{ textAlign: 'center', padding: '14px 0 4px', fontSize: 10.5, color: 'var(--text-4)' }}>
               — end of {notes.length} notes —
             </div>
           </>

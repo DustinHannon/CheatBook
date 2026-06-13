@@ -6,6 +6,7 @@ import { useToast } from './Toast';
 import { searchNotes } from '../lib/api';
 import type { Note } from '../lib/types';
 import { Skeleton } from './ui/Skeleton';
+import { InputDialog } from './InputDialog';
 
 const supabase = createClient();
 
@@ -32,6 +33,7 @@ const PATH_NEW = 'M12 5v14M5 12h14';
 const PATH_INVITE = 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M19 8v6M22 11h-6';
 const PATH_DASHBOARD = 'M3 11l9-7 9 7M5 10v9h14v-9';
 const PATH_UPLOAD = 'M12 3v12M7 8l5-5 5 5M5 21h14';
+const PATH_SPACE = 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z';
 
 interface ActionDef {
   id: string;
@@ -48,13 +50,14 @@ type Row =
 
 export const CommandPalette: React.FC = () => {
   const router = useRouter();
-  const { paletteOpen, closePalette, teamId, notes, spaces, createNote } = useApp();
+  const { paletteOpen, closePalette, teamId, notes, spaces, createNote, createSpace } = useApp();
   const { showToast } = useToast();
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Note[] | null>(null); // null = use recent notes
   const [searching, setSearching] = useState(false);
   const [active, setActive] = useState(0);
+  const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -107,12 +110,29 @@ export const CommandPalette: React.FC = () => {
 
   // ── Quick action definitions + their handlers ─────────────────────────
   const runCreateNote = useCallback(async () => {
+    // No spaces yet → route the user into creating one instead of dead-ending.
+    if (!firstSpaceId) {
+      closePalette();
+      setSpaceDialogOpen(true);
+      showToast('Create a space first, then add notes to it.', 'info');
+      return;
+    }
     closePalette();
-    if (!firstSpaceId) { showToast('Create a space first to add a note.', 'info'); return; }
     const note = await createNote(firstSpaceId);
     if (note) router.push('/notes/' + note.id);
     else showToast('Could not create note.', 'error');
   }, [closePalette, firstSpaceId, createNote, router, showToast]);
+
+  const runCreateSpace = useCallback(() => {
+    closePalette();
+    setSpaceDialogOpen(true);
+  }, [closePalette]);
+
+  const handleCreateSpace = useCallback(async (name: string) => {
+    setSpaceDialogOpen(false);
+    const sp = await createSpace(name);
+    showToast(sp ? `Space “${name}” created.` : 'Could not create space.', sp ? 'success' : 'error');
+  }, [createSpace, showToast]);
 
   // Target note for note-scoped actions: the open note, else the most recent.
   const targetNoteId = currentNoteId
@@ -138,10 +158,11 @@ export const CommandPalette: React.FC = () => {
 
   const actionDefs = useMemo<ActionDef[]>(() => [
     { id: 'new', label: 'Create a new note', pathD: PATH_NEW, hotkey: 'N', run: runCreateNote },
+    { id: 'space', label: 'Create a space', pathD: PATH_SPACE, run: runCreateSpace },
     { id: 'invite', label: 'Invite a teammate', pathD: PATH_INVITE, run: runInvite },
     { id: 'dashboard', label: 'Go to Dashboard', pathD: PATH_DASHBOARD, run: runDashboard },
     { id: 'upload', label: 'Upload an image to this note', pathD: PATH_UPLOAD, run: runUpload },
-  ], [runCreateNote, runInvite, runDashboard, runUpload]);
+  ], [runCreateNote, runCreateSpace, runInvite, runDashboard, runUpload]);
 
   // Quick actions filtered by label (mirrors reference logic).
   const actionHits = useMemo<ActionDef[]>(
@@ -202,18 +223,28 @@ export const CommandPalette: React.FC = () => {
     }
   }, [rows, active, closePalette]);
 
-  if (!paletteOpen) return null;
-
   const hasNoteResults = noteHits.length > 0 || showSkeleton;
   const hasActionResults = actionHits.length > 0;
 
   return (
+    <>
+      {/* Create-space dialog lives outside the palette so it survives closing it. */}
+      <InputDialog
+        open={spaceDialogOpen}
+        title="Create a space"
+        label="Space name"
+        placeholder="e.g. Incident Response"
+        confirmLabel="Create space"
+        onSubmit={handleCreateSpace}
+        onCancel={() => setSpaceDialogOpen(false)}
+      />
+      {paletteOpen && (
     <div
       onMouseDown={closePalette}
       role="presentation"
       style={{
         position: 'fixed', inset: 0, zIndex: 50,
-        background: 'rgba(4,6,11,0.6)',
+        background: 'var(--backdrop)',
         backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
         display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
         paddingTop: '13vh',
@@ -230,17 +261,17 @@ export const CommandPalette: React.FC = () => {
           display: 'flex', flexDirection: 'column',
           borderRadius: 18, overflow: 'hidden',
           animation: 'cbUp .18s ease',
-          background: 'linear-gradient(180deg,rgba(26,32,44,0.92),rgba(16,20,30,0.92))',
+          background: 'var(--modal-grad)',
           backdropFilter: 'blur(40px) saturate(170%)', WebkitBackdropFilter: 'blur(40px) saturate(170%)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          boxShadow: '0 40px 100px -30px rgba(0,0,0,0.9),inset 0 1px 0 rgba(255,255,255,0.08)',
+          border: '1px solid var(--modal-border)',
+          boxShadow: 'var(--modal-shadow)',
         }}
       >
         {/* Search input row */}
         <div
           style={{
             display: 'flex', alignItems: 'center', gap: 12,
-            padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)',
+            padding: '16px 18px', borderBottom: '1px solid var(--hairline)',
           }}
         >
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#6ea8fe" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
@@ -258,15 +289,15 @@ export const CommandPalette: React.FC = () => {
             spellCheck={false}
             style={{
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
-              color: '#eef2f8', fontSize: 15, fontFamily: "'Manrope',sans-serif",
+              color: 'var(--text-strong)', fontSize: 15, fontFamily: "'Manrope',sans-serif",
             }}
           />
           <span
             className="font-mono"
             style={{
               fontSize: 10, padding: '3px 7px', borderRadius: 6,
-              background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)',
-              color: '#9aa6ba',
+              background: 'var(--bg-hover-2)', border: '1px solid var(--hairline)',
+              color: 'var(--text-3)',
             }}
           >
             ESC
@@ -285,7 +316,7 @@ export const CommandPalette: React.FC = () => {
             <>
               <div
                 className="font-mono"
-                style={{ fontSize: 10, letterSpacing: '0.1em', color: '#6f7c92', padding: '8px 12px 5px' }}
+                style={{ fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-4)', padding: '8px 12px 5px' }}
               >
                 NOTES
               </div>
@@ -324,14 +355,14 @@ export const CommandPalette: React.FC = () => {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
-                            fontSize: 13.5, fontWeight: 600, color: '#e7ecf3',
+                            fontSize: 13.5, fontWeight: 600, color: 'var(--text)',
                             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                           }}
                         >
                           {n.title || 'Untitled note'}
                         </div>
                       </div>
-                      <span className="font-mono" style={{ fontSize: 10, color: '#6f7c92' }}>
+                      <span className="font-mono" style={{ fontSize: 10, color: 'var(--text-4)' }}>
                         {n.space?.name || ''}
                       </span>
                     </div>
@@ -345,7 +376,7 @@ export const CommandPalette: React.FC = () => {
             <>
               <div
                 className="font-mono"
-                style={{ fontSize: 10, letterSpacing: '0.1em', color: '#6f7c92', padding: '12px 12px 5px' }}
+                style={{ fontSize: 10, letterSpacing: '0.1em', color: 'var(--text-4)', padding: '12px 12px 5px' }}
               >
                 QUICK ACTIONS
               </div>
@@ -377,14 +408,14 @@ export const CommandPalette: React.FC = () => {
                     >
                       <ActionIcon d={a.pathD} />
                     </div>
-                    <div style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: '#e7ecf3' }}>{a.label}</div>
+                    <div style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>{a.label}</div>
                     {a.hotkey && (
                       <span
                         className="font-mono"
                         style={{
                           fontSize: 10, padding: '2px 7px', borderRadius: 6,
-                          background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)',
-                          color: '#9aa6ba',
+                          background: 'var(--bg-hover-2)', border: '1px solid var(--hairline)',
+                          color: 'var(--text-3)',
                         }}
                       >
                         {a.hotkey}
@@ -397,7 +428,7 @@ export const CommandPalette: React.FC = () => {
           )}
 
           {noResults && (
-            <div style={{ padding: 34, textAlign: 'center', fontSize: 13, color: '#6f7c92' }}>
+            <div style={{ padding: 34, textAlign: 'center', fontSize: 13, color: 'var(--text-4)' }}>
               No matches for “{query.trim()}”
             </div>
           )}
@@ -408,8 +439,8 @@ export const CommandPalette: React.FC = () => {
           className="font-mono"
           style={{
             display: 'flex', alignItems: 'center', gap: 16,
-            padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.07)',
-            fontSize: 10, color: '#6f7c92',
+            padding: '10px 16px', borderTop: '1px solid var(--hairline)',
+            fontSize: 10, color: 'var(--text-4)',
           }}
         >
           <span>↑↓ navigate</span>
@@ -418,6 +449,8 @@ export const CommandPalette: React.FC = () => {
         </div>
       </div>
     </div>
+      )}
+    </>
   );
 };
 

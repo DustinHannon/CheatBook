@@ -12,7 +12,7 @@ export const Eyebrow: React.FC<{ children: React.ReactNode; className?: string; 
     style={{
       fontSize: 9.5,
       letterSpacing: '0.12em',
-      color: '#6f7c92',
+      color: 'var(--text-4)',
       ...style,
     }}
   >
@@ -23,10 +23,10 @@ export const Eyebrow: React.FC<{ children: React.ReactNode; className?: string; 
 /** Section heading + lead paragraph block used atop every section. */
 export const SectionHead: React.FC<{ title: string; lead: string }> = ({ title, lead }) => (
   <>
-    <h2 style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', color: '#e7ecf3' }}>
+    <h2 style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)' }}>
       {title}
     </h2>
-    <p style={{ margin: '0 0 26px', fontSize: 13, color: '#8b97ab', lineHeight: 1.55 }}>{lead}</p>
+    <p style={{ margin: '0 0 26px', fontSize: 13, color: 'var(--text-3)', lineHeight: 1.55 }}>{lead}</p>
   </>
 );
 
@@ -46,7 +46,7 @@ export const Field: React.FC<{
       <label
         htmlFor={id}
         className="font-mono"
-        style={{ display: 'block', fontSize: 9.5, letterSpacing: '0.1em', color: '#9aa6ba', marginBottom: 7 }}
+        style={{ display: 'block', fontSize: 9.5, letterSpacing: '0.1em', color: 'var(--text-3)', marginBottom: 7 }}
       >
         {label}
       </label>
@@ -63,10 +63,10 @@ export const Field: React.FC<{
           height: 44,
           padding: '0 13px',
           borderRadius: 11,
-          background: 'rgba(8,11,18,0.45)',
-          border: '1px solid rgba(255,255,255,0.1)',
+          background: 'var(--surface-input)',
+          border: '1px solid var(--border-strong)',
           outline: 'none',
-          color: '#eef2f8',
+          color: 'var(--text-strong)',
           fontSize: 13.5,
         }}
       />
@@ -91,7 +91,7 @@ export const Toggle: React.FC<{ on: boolean; onToggle: () => void; label: string
       cursor: 'pointer',
       padding: 0,
       border: 'none',
-      background: on ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
+      background: on ? 'var(--accent)' : 'var(--bg-hover)',
       transition: 'background 0.16s ease',
     }}
   >
@@ -104,7 +104,7 @@ export const Toggle: React.FC<{ on: boolean; onToggle: () => void; label: string
         width: 20,
         height: 20,
         borderRadius: '50%',
-        background: on ? '#fff' : '#aeb9ca',
+        background: on ? '#fff' : 'var(--text-3)',
         boxShadow: '0 2px 5px rgba(0,0,0,0.4)',
         transition: 'left 0.16s ease, background 0.16s ease',
       }}
@@ -119,10 +119,10 @@ export const ToggleRow: React.FC<{
   on: boolean;
   onToggle: () => void;
 }> = ({ label, desc, on, onToggle }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: 'rgba(255,255,255,0.025)' }}>
+  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: 'var(--bg-hover)' }}>
     <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 13.5, fontWeight: 600, color: '#eef2f8' }}>{label}</div>
-      <div style={{ fontSize: 11.5, color: '#8b97ab', marginTop: 2 }}>{desc}</div>
+      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-strong)' }}>{label}</div>
+      <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2 }}>{desc}</div>
     </div>
     <Toggle on={on} onToggle={onToggle} label={label} />
   </div>
@@ -137,7 +137,7 @@ export const RowList: React.FC<{ children: React.ReactNode; style?: React.CSSPro
       gap: 1,
       borderRadius: 14,
       overflow: 'hidden',
-      border: '1px solid rgba(255,255,255,0.07)',
+      border: '1px solid var(--hairline)',
       ...style,
     }}
   >
@@ -147,13 +147,13 @@ export const RowList: React.FC<{ children: React.ReactNode; style?: React.CSSPro
 
 /** A single read-only "label · value · optional pill" row (account identity table). */
 export const InfoRow: React.FC<{ label: string; value: React.ReactNode; pill?: string }> = ({ label, value, pill }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: 'rgba(255,255,255,0.025)' }}>
-    <span style={{ fontSize: 12.5, color: '#8b97ab', width: 120, flex: '0 0 auto' }}>{label}</span>
-    <span style={{ flex: 1, fontSize: 13.5, color: '#eef2f8' }}>{value}</span>
+  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: 'var(--bg-hover)' }}>
+    <span style={{ fontSize: 12.5, color: 'var(--text-3)', width: 120, flex: '0 0 auto' }}>{label}</span>
+    <span style={{ flex: 1, fontSize: 13.5, color: 'var(--text-strong)' }}>{value}</span>
     {pill && (
       <span
         className="font-mono"
-        style={{ fontSize: 9.5, color: '#6f7c92', padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)' }}
+        style={{ fontSize: 9.5, color: 'var(--text-4)', padding: '3px 8px', borderRadius: 6, background: 'var(--bg-hover)' }}
       >
         {pill}
       </span>

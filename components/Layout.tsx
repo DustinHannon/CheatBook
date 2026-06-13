@@ -47,14 +47,14 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const gridCols = isMobile || overlay ? '1fr' : effectiveCollapsed ? '78px 1fr' : '266px 1fr';
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#05070b] p-[14px] text-text">
+    <div className="relative h-screen w-screen overflow-hidden bg-bg p-[14px] text-text">
       <AuroraBackground position="absolute" />
       <div className="relative z-[1] grid h-full min-h-0 gap-3" style={{ gridTemplateColumns: gridCols }}>
         {overlay && (
           <div
             onClick={closeNav}
             className="fixed inset-0 z-[64]"
-            style={{ background: 'rgba(4,6,11,0.55)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)' }}
+            style={{ background: 'var(--backdrop)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)' }}
           />
         )}
         {mode !== 'hidden' && (

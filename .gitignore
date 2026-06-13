@@ -29,3 +29,4 @@ tsconfig.tsbuildinfo
 # QA / Playwright run artifacts
 .playwright-mcp/
 /F[0-9]*.png
+/*.png

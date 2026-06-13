@@ -3,20 +3,22 @@ import { createClient } from '../lib/supabase/client';
 import { useAuth } from './AuthContext';
 import { useToast } from './Toast';
 import { updateAppearance } from '../lib/api';
-import type { Appearance, Density } from '../lib/types';
+import type { Appearance, Density, Theme } from '../lib/types';
 
-const DEFAULT: Appearance = { accent: '#6ea8fe', density: 'balanced' };
+const DEFAULT: Appearance = { accent: '#6ea8fe', density: 'balanced', theme: 'dark' };
 
 type AppearanceContextType = {
   appearance: Appearance;
   setAccent: (accent: string) => void;
   setDensity: (density: Density) => void;
+  setTheme: (theme: Theme) => void;
 };
 
 const AppearanceContext = createContext<AppearanceContextType>({
   appearance: DEFAULT,
   setAccent: () => {},
   setDensity: () => {},
+  setTheme: () => {},
 });
 
 const supabase = createClient();
@@ -49,16 +51,23 @@ export const AppearanceProvider: React.FC<{ children: ReactNode }> = ({ children
     let cancelled = false;
     supabase.from('profiles').select('appearance').eq('id', user.id).maybeSingle().then(({ data, error }) => {
       if (cancelled || error || !data?.appearance) return;
-      const a = data.appearance as unknown as Appearance;
-      commit({ accent: a.accent || DEFAULT.accent, density: a.density || DEFAULT.density });
+      const a = data.appearance as unknown as Partial<Appearance>;
+      commit({
+        accent: a.accent || DEFAULT.accent,
+        density: a.density || DEFAULT.density,
+        theme: a.theme || DEFAULT.theme,
+      });
     });
     return () => { cancelled = true; };
   }, [user, commit]);
 
-  // Apply to the document whenever it changes.
+  // Apply to the document whenever it changes, and cache for the pre-paint boot
+  // script in _document so a reload never flashes the wrong theme.
   useEffect(() => {
     applyAccent(appearance.accent);
     document.documentElement.setAttribute('data-density', appearance.density);
+    document.documentElement.setAttribute('data-theme', appearance.theme);
+    try { window.localStorage.setItem('cb-appearance', JSON.stringify(appearance)); } catch { /* private mode */ }
   }, [appearance]);
 
   // Optimistic commit; the network write is a side effect OUTSIDE the state
@@ -76,9 +85,10 @@ export const AppearanceProvider: React.FC<{ children: ReactNode }> = ({ children
 
   const setAccent = useCallback((accent: string) => persist({ ...appearanceRef.current, accent }), [persist]);
   const setDensity = useCallback((density: Density) => persist({ ...appearanceRef.current, density }), [persist]);
+  const setTheme = useCallback((theme: Theme) => persist({ ...appearanceRef.current, theme }), [persist]);
 
   return (
-    <AppearanceContext.Provider value={{ appearance, setAccent, setDensity }}>
+    <AppearanceContext.Provider value={{ appearance, setAccent, setDensity, setTheme }}>
       {children}
     </AppearanceContext.Provider>
   );

@@ -13,7 +13,7 @@ export default function LoginPage() {
   }, [isAuthenticated, isLoading, router]);
 
   return (
-    <div className="relative flex min-h-screen w-screen items-center justify-center overflow-x-hidden bg-[#05070b] px-[18px] py-8">
+    <div className="relative flex min-h-screen w-screen items-center justify-center overflow-x-hidden bg-bg px-[18px] py-8">
       <AuroraBackground />
       <LoginCard />
     </div>

@@ -9,7 +9,7 @@ interface ToastContextType { showToast: (message: string, type?: ToastType) => v
 const ToastContext = createContext<ToastContextType>({ showToast: () => {} });
 
 let counter = 0;
-const ACCENT: Record<ToastType, string> = { success: '#5eead4', error: '#fb87a4', info: '#6ea8fe' };
+const ACCENT: Record<ToastType, string> = { success: 'var(--success)', error: 'var(--danger)', info: 'var(--accent)' };
 
 export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);

@@ -105,7 +105,7 @@ export const LoginCard: React.FC = () => {
             height="24"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#0a0f1a"
+            stroke="var(--text-on-accent)"
             strokeWidth="2.2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -122,7 +122,7 @@ export const LoginCard: React.FC = () => {
               fontFamily: "'JetBrains Mono',monospace",
               fontSize: 10,
               letterSpacing: '0.12em',
-              color: '#7c8aa0',
+              color: 'var(--text-4)',
               marginTop: 4,
             }}
           >
@@ -141,7 +141,7 @@ export const LoginCard: React.FC = () => {
             'linear-gradient(180deg,rgba(255,255,255,0.058),rgba(255,255,255,0.022))',
           backdropFilter: 'blur(36px) saturate(165%)',
           WebkitBackdropFilter: 'blur(36px) saturate(165%)',
-          border: '1px solid rgba(255,255,255,0.09)',
+          border: '1px solid var(--hairline)',
           boxShadow:
             'inset 0 1px 0 rgba(255,255,255,0.08),0 30px 80px -32px rgba(0,0,0,0.9)',
         }}
@@ -162,7 +162,7 @@ export const LoginCard: React.FC = () => {
             margin: '0 0 24px',
             fontSize: 13.5,
             lineHeight: 1.55,
-            color: '#8b97ab',
+            color: 'var(--text-3)',
             textAlign: 'center',
           }}
         >
@@ -234,9 +234,11 @@ export const LoginCard: React.FC = () => {
             style={{
               fontSize: 11.5,
               lineHeight: 1.5,
-              color: '#fb87a4',
+              color: 'var(--danger)',
               textAlign: 'center',
               margin: '10px 0 0',
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
             }}
           >
             {entraErr}
@@ -250,7 +252,7 @@ export const LoginCard: React.FC = () => {
             justifyContent: 'center',
             gap: 7,
             marginTop: 14,
-            color: '#6f7c92',
+            color: 'var(--text-4)',
           }}
         >
           <svg
@@ -280,18 +282,18 @@ export const LoginCard: React.FC = () => {
 
         {/* divider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '22px 0 4px' }}>
-          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.09)' }} />
+          <div style={{ flex: 1, height: 1, background: 'var(--hairline)' }} />
           <span
             style={{
               fontFamily: "'JetBrains Mono',monospace",
               fontSize: 9.5,
               letterSpacing: '0.14em',
-              color: '#5d6a7e',
+              color: 'var(--text-4)',
             }}
           >
             EMERGENCY ACCESS
           </span>
-          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.09)' }} />
+          <div style={{ flex: 1, height: 1, background: 'var(--hairline)' }} />
         </div>
 
         {/* break-glass trigger */}
@@ -321,7 +323,7 @@ export const LoginCard: React.FC = () => {
               flex: '0 0 auto',
               display: 'grid',
               placeItems: 'center',
-              color: '#fbbf72',
+              color: 'var(--warning)',
               background: 'rgba(251,191,114,0.13)',
               border: '1px solid rgba(251,191,114,0.22)',
             }}
@@ -342,10 +344,10 @@ export const LoginCard: React.FC = () => {
             </svg>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: '#dbe2ec' }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-2)' }}>
               Use a break-glass account
             </div>
-            <div style={{ fontSize: 11.5, color: '#7c8aa0', marginTop: 2 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--text-4)', marginTop: 2 }}>
               Backup login if Entra ID is unavailable
             </div>
           </div>
@@ -368,7 +370,7 @@ export const LoginCard: React.FC = () => {
             <svg
               width="18"
               height="18"
-              style={{ flex: '0 0 auto', color: '#8b97ab' }}
+              style={{ flex: '0 0 auto', color: 'var(--text-3)' }}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -402,7 +404,7 @@ export const LoginCard: React.FC = () => {
                 style={{ flex: '0 0 auto', marginTop: 1 }}
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#fbbf72"
+                stroke="var(--warning)"
                 strokeWidth="1.9"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -424,7 +426,7 @@ export const LoginCard: React.FC = () => {
                 fontFamily: "'JetBrains Mono',monospace",
                 fontSize: 9.5,
                 letterSpacing: '0.1em',
-                color: '#9aa6ba',
+                color: 'var(--text-3)',
                 marginBottom: 6,
               }}
             >
@@ -447,9 +449,9 @@ export const LoginCard: React.FC = () => {
                 padding: '0 13px',
                 borderRadius: 11,
                 background: 'rgba(8,11,18,0.5)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                border: '1px solid var(--hairline)',
                 outline: 'none',
-                color: '#eef2f8',
+                color: 'var(--text-strong)',
                 fontSize: 13.5,
                 fontFamily: "'Manrope',system-ui,sans-serif",
                 marginBottom: 13,
@@ -458,7 +460,7 @@ export const LoginCard: React.FC = () => {
                 e.currentTarget.style.borderColor = 'rgba(251,191,114,0.5)';
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                e.currentTarget.style.borderColor = 'var(--hairline)';
               }}
             />
 
@@ -469,7 +471,7 @@ export const LoginCard: React.FC = () => {
                 fontFamily: "'JetBrains Mono',monospace",
                 fontSize: 9.5,
                 letterSpacing: '0.1em',
-                color: '#9aa6ba',
+                color: 'var(--text-3)',
                 marginBottom: 6,
               }}
             >
@@ -494,9 +496,9 @@ export const LoginCard: React.FC = () => {
                   padding: '0 44px 0 13px',
                   borderRadius: 11,
                   background: 'rgba(8,11,18,0.5)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  border: '1px solid var(--hairline)',
                   outline: 'none',
-                  color: '#eef2f8',
+                  color: 'var(--text-strong)',
                   fontSize: 13.5,
                   fontFamily: "'JetBrains Mono',monospace",
                 }}
@@ -504,7 +506,7 @@ export const LoginCard: React.FC = () => {
                   e.currentTarget.style.borderColor = 'rgba(251,191,114,0.5)';
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.borderColor = 'var(--hairline)';
                 }}
               />
               <button
@@ -522,16 +524,16 @@ export const LoginCard: React.FC = () => {
                   borderRadius: 8,
                   display: 'grid',
                   placeItems: 'center',
-                  color: '#8b97ab',
+                  color: 'var(--text-3)',
                   background: 'transparent',
                   cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#e7ecf3';
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                  e.currentTarget.style.color = 'var(--text)';
+                  e.currentTarget.style.background = 'var(--bg-hover)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#8b97ab';
+                  e.currentTarget.style.color = 'var(--text-3)';
                   e.currentTarget.style.background = 'transparent';
                 }}
               >
@@ -570,7 +572,7 @@ export const LoginCard: React.FC = () => {
             </div>
 
             {breakErr && (
-              <div role="alert" style={{ fontSize: 11.5, color: '#fb87a4', margin: '8px 0 2px' }}>
+              <div role="alert" style={{ fontSize: 11.5, color: '#fb87a4', margin: '8px 0 2px', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                 {breakErr}
               </div>
             )}
@@ -638,7 +640,7 @@ export const LoginCard: React.FC = () => {
       </div>
 
       {/* footer */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 22, color: '#5d6a7e' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 22, color: 'var(--text-4)' }}>
         <svg
           width="13"
           height="13"
@@ -666,7 +668,7 @@ export const LoginCard: React.FC = () => {
         style={{
           fontFamily: "'JetBrains Mono',monospace",
           fontSize: 9.5,
-          color: '#46505f',
+          color: 'var(--text-4)',
           marginTop: 10,
         }}
       >

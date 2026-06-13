@@ -26,7 +26,7 @@ function useViewport(): { isMobile: boolean; isTablet: boolean } {
 }
 
 const PlusIcon: React.FC = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0a0f1a" strokeWidth="2.4" strokeLinecap="round">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-on-accent)" strokeWidth="2.4" strokeLinecap="round">
     <path d="M12 5v14M5 12h14" />
   </svg>
 );
@@ -38,7 +38,7 @@ const MenuIcon: React.FC = () => (
 );
 
 const ClockIcon: React.FC = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fb87a4" strokeWidth="1.9" strokeLinecap="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="1.9" strokeLinecap="round">
     <circle cx="12" cy="12" r="9" />
     <path d="M12 7v5l3 2" />
   </svg>
@@ -51,7 +51,7 @@ const MiniAvatar: React.FC<{ member: Member }> = ({ member }) => (
     style={{
       width: 22, height: 22, marginRight: -7, fontSize: 9,
       color: member.color, background: hexa(member.color, 0.18),
-      border: '1.5px solid #0c1119',
+      border: '1.5px solid var(--surface-raised)',
     }}
     title={member.name}
   >
@@ -135,8 +135,8 @@ export const Dashboard: React.FC = () => {
               type="button"
               onClick={openNav}
               aria-label="Open navigation"
-              className="grid flex-none cursor-pointer place-items-center self-center text-[#c7d0de] hover:bg-white/[0.06]"
-              style={{ width: 44, height: 44, borderRadius: 9, border: '1px solid rgba(255,255,255,0.08)' }}
+              className="grid flex-none cursor-pointer place-items-center self-center text-text-2 hover:bg-hover"
+              style={{ width: 44, height: 44, borderRadius: 9, border: '1px solid var(--hairline)' }}
             >
               <MenuIcon />
             </button>
@@ -208,10 +208,10 @@ export const Dashboard: React.FC = () => {
             <div
               style={{
                 padding: 18, borderRadius: 16,
-                background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.07)',
+                background: 'var(--bg-hover)', border: '1px solid var(--hairline)',
               }}
             >
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#eef2f8', marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-strong)', marginBottom: 14 }}>
                 Continue where you left off
               </div>
               <div className="flex flex-col gap-2">
@@ -220,7 +220,7 @@ export const Dashboard: React.FC = () => {
                     <Skeleton key={i} className="h-[50px] rounded-[12px]" />
                   ))
                 ) : recent.length === 0 ? (
-                  <div style={{ fontSize: 12.5, color: '#6f7c92', padding: '6px 2px' }}>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-4)', padding: '6px 2px' }}>
                     No notes yet — create your first one.
                   </div>
                 ) : (
@@ -236,10 +236,10 @@ export const Dashboard: React.FC = () => {
                         key={n.id}
                         type="button"
                         onClick={() => openNote(n.id)}
-                        className="flex w-full items-center gap-[13px] text-left hover:!border-white/[0.12] hover:!bg-white/[0.06]"
+                        className="flex w-full items-center gap-[13px] text-left hover:!border-strong hover:!bg-hover"
                         style={{
                           padding: '11px 13px', borderRadius: 12, cursor: 'pointer',
-                          background: 'rgba(255,255,255,0.028)', border: '1px solid rgba(255,255,255,0.05)',
+                          background: 'var(--bg-hover)', border: '1px solid var(--hairline)',
                         }}
                       >
                         <span
@@ -252,13 +252,13 @@ export const Dashboard: React.FC = () => {
                         <span className="min-w-0 flex-1">
                           <span
                             className="block truncate"
-                            style={{ fontSize: 13.5, fontWeight: 700, color: '#dbe2ec' }}
+                            style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-2)' }}
                           >
                             {n.title || 'Untitled note'}
                           </span>
                           <span
                             className="block font-mono"
-                            style={{ fontSize: 10.5, color: '#6f7c92', marginTop: 2 }}
+                            style={{ fontSize: 10.5, color: 'var(--text-4)', marginTop: 2 }}
                           >
                             {space?.name || 'No space'} · {relativeTime(n.updatedAt)}
                           </span>
@@ -294,7 +294,7 @@ export const Dashboard: React.FC = () => {
                     <Skeleton key={i} className="h-[44px] rounded-[11px]" />
                   ))
                 ) : stale.length === 0 ? (
-                  <div style={{ fontSize: 12.5, color: '#9aa6ba', padding: '4px 2px' }}>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-3)', padding: '4px 2px' }}>
                     Nothing stale — your knowledge base is fresh.
                   </div>
                 ) : (
@@ -305,22 +305,22 @@ export const Dashboard: React.FC = () => {
                         key={n.id}
                         type="button"
                         onClick={() => openNote(n.id)}
-                        className="flex w-full items-center gap-3 text-left hover:!bg-white/[0.055]"
+                        className="flex w-full items-center gap-3 text-left hover:!bg-hover"
                         style={{
                           padding: '10px 12px', borderRadius: 11, cursor: 'pointer',
-                          background: 'rgba(255,255,255,0.025)', border: '1px solid transparent',
+                          background: 'var(--bg-hover)', border: '1px solid transparent',
                         }}
                       >
                         <span className="min-w-0 flex-1">
                           <span
                             className="block truncate"
-                            style={{ fontSize: 13, fontWeight: 700, color: '#dbe2ec' }}
+                            style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)' }}
                           >
                             {n.title || 'Untitled note'}
                           </span>
                           <span
                             className="block font-mono"
-                            style={{ fontSize: 10.5, color: '#9aa6ba', marginTop: 2 }}
+                            style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 2 }}
                           >
                             {n.space?.name || 'No space'}
                           </span>
@@ -328,7 +328,7 @@ export const Dashboard: React.FC = () => {
                         <span
                           className="whitespace-nowrap font-mono"
                           style={{
-                            fontSize: 10, fontWeight: 600, color: '#fb87a4',
+                            fontSize: 10, fontWeight: 600, color: 'var(--danger)',
                             padding: '3px 8px', borderRadius: 6, background: 'rgba(251,135,164,0.14)',
                           }}
                         >
@@ -346,15 +346,15 @@ export const Dashboard: React.FC = () => {
           <div
             style={{
               padding: 18, borderRadius: 16,
-              background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.07)',
+              background: 'var(--bg-hover)', border: '1px solid var(--hairline)',
             }}
           >
             <div className="mb-4 flex items-center gap-2">
               <span
                 className="animate-cb-pulse"
-                style={{ width: 7, height: 7, borderRadius: '50%', background: '#5eead4' }}
+                style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)' }}
               />
-              <span style={{ fontSize: 13, fontWeight: 800, color: '#eef2f8' }}>Live activity</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-strong)' }}>Live activity</span>
             </div>
             <div className="flex flex-col">
               {loading ? (
@@ -362,14 +362,14 @@ export const Dashboard: React.FC = () => {
                   <div
                     key={i}
                     className="flex gap-3"
-                    style={{ padding: '9px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                    style={{ padding: '9px 0', borderBottom: '1px solid var(--hairline)' }}
                   >
                     <Skeleton className="h-7 w-7 flex-none rounded-full" />
                     <Skeleton className="h-8 flex-1" />
                   </div>
                 ))
               ) : activity.length === 0 ? (
-                <div style={{ fontSize: 12.5, color: '#6f7c92', padding: '6px 0' }}>
+                <div style={{ fontSize: 12.5, color: 'var(--text-4)', padding: '6px 0' }}>
                   No recent activity.
                 </div>
               ) : (
@@ -380,7 +380,7 @@ export const Dashboard: React.FC = () => {
                     <div
                       key={a.id}
                       className="flex gap-3"
-                      style={{ padding: '9px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                      style={{ padding: '9px 0', borderBottom: '1px solid var(--hairline)' }}
                     >
                       {actor ? (
                         <Avatar
@@ -396,21 +396,21 @@ export const Dashboard: React.FC = () => {
                           className="grid flex-none place-items-center rounded-full font-mono font-bold"
                           style={{
                             width: 28, height: 28, fontSize: 10,
-                            color, background: hexa(color, 0.18), border: '1.5px solid #0c1119',
+                            color, background: hexa(color, 0.18), border: '1.5px solid var(--surface-raised)',
                           }}
                         >
                           {a.actorName.slice(0, 2).toUpperCase()}
                         </div>
                       )}
-                      <div className="min-w-0 flex-1" style={{ fontSize: 12.5, lineHeight: 1.5, color: '#aeb9ca' }}>
-                        <strong style={{ color: '#e7ecf3', fontWeight: 700 }}>{a.actorName}</strong>{' '}
+                      <div className="min-w-0 flex-1" style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-3)' }}>
+                        <strong style={{ color: 'var(--text)', fontWeight: 700 }}>{a.actorName}</strong>{' '}
                         {a.verb}{' '}
                         {a.targetTitle && (
                           <span style={{ color: a.spaceColor || '#6ea8fe', fontWeight: 600 }}>
                             {a.targetTitle}
                           </span>
                         )}
-                        <div className="font-mono" style={{ fontSize: 10, color: '#6f7c92', marginTop: 3 }}>
+                        <div className="font-mono" style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 3 }}>
                           {relativeTime(a.createdAt)}
                         </div>
                       </div>

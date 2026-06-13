@@ -8,7 +8,7 @@ import { relativeTime, fileSize } from '../lib/time';
 import { docToMarkdown } from '../lib/blocks';
 import { createClient } from '../lib/supabase/client';
 import {
-  updateNoteMeta, moveNoteToSpace, duplicateNote, deleteNote, getActivity, setLocked,
+  updateNoteMeta, duplicateNote, getActivity, setLocked,
   getAttachments, uploadAttachment, deleteAttachment,
 } from '../lib/api';
 import { NoteEditor, type EditorPeer } from './NoteEditor';
@@ -45,7 +45,7 @@ const ico = (d: string, fill = 'none', sw = '1.8') => (
  */
 export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
   const router = useRouter();
-  const { me, setPinned, toggleStar, refreshNotes, spaces } = useApp();
+  const { me, setPinned, toggleStar, refreshNotes, refreshSpaces, deleteNote, moveNote, spaces } = useApp();
   const { showToast } = useToast();
   const attachInputRef = useRef<HTMLInputElement>(null);
 
@@ -171,12 +171,13 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
     try {
       const copy = await duplicateNote(supabase, note.id);
       void refreshNotes();
+      void refreshSpaces();
       showToast('Note duplicated.', 'success');
       router.push(`/notes/${copy.id}`);
     } catch {
       showToast('Could not duplicate note.', 'error');
     }
-  }, [note.id, refreshNotes, router, showToast]);
+  }, [note.id, refreshNotes, refreshSpaces, router, showToast]);
 
   const doExport = useCallback(() => {
     try {
@@ -197,14 +198,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
 
   const doMove = useCallback(async (spaceId: string) => {
     setMoveOpen(false);
-    try {
-      await moveNoteToSpace(supabase, note.id, spaceId);
-      void refreshNotes();
-      showToast('Note moved.', 'success');
-    } catch {
-      showToast('Could not move note.', 'error');
-    }
-  }, [note.id, refreshNotes, showToast]);
+    const ok = await moveNote(note.id, spaceId);
+    showToast(ok ? 'Note moved.' : 'Could not move note.', ok ? 'success' : 'error');
+  }, [note.id, moveNote, showToast]);
 
   const doLock = useCallback(async () => {
     setMenuOpen(false);
@@ -219,15 +215,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
 
   const doDelete = useCallback(async () => {
     setDeleteOpen(false);
-    try {
-      await deleteNote(supabase, note.id);
-      void refreshNotes();
-      showToast('Note deleted.', 'success');
-      router.push('/notes');
-    } catch {
-      showToast('Could not delete note.', 'error');
-    }
-  }, [note.id, refreshNotes, router, showToast]);
+    const ok = await deleteNote(note.id);
+    if (ok) { showToast('Note deleted.', 'success'); router.push('/notes'); }
+    else showToast('Could not delete note.', 'error');
+  }, [note.id, deleteNote, router, showToast]);
 
   const actions: OverflowAction[] = [
     {
@@ -275,13 +266,13 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
   return (
     <section className="cb-panel relative flex min-h-0 flex-col" style={{ borderRadius: 20 }}>
       {/* ── toolbar ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 border-b border-white/[0.06]" style={{ padding: '14px 18px' }}>
+      <div className="flex items-center gap-3 border-b border-hairline" style={{ padding: '14px 18px' }}>
         {/* mobile back to list */}
         <button
           type="button"
           onClick={() => (onBack ? onBack() : router.push('/notes'))}
           aria-label="Back to notes"
-          className="grid flex-none cursor-pointer place-items-center border border-white/[0.08] text-text-2 hover:bg-white/[0.06] md:hidden"
+          className="grid flex-none cursor-pointer place-items-center border border-hairline text-text-2 hover:bg-hover md:hidden"
           style={{ width: 32, height: 32, minWidth: 44, minHeight: 44, borderRadius: 9 }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
@@ -293,7 +284,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: spaceColor }} />
             {spaceName}
           </span>
-          <span style={{ color: '#4f5b6e' }}>/</span>
+          <span style={{ color: 'var(--text-4)' }}>/</span>
           <span className="overflow-hidden font-semibold text-text-2" style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{note.title || 'Untitled note'}</span>
         </div>
 
@@ -313,7 +304,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
                       className="grid place-items-center rounded-full font-mono font-bold"
                       style={{
                         width: 28, height: 28, marginRight: -8, fontSize: 10,
-                        color: t.color, background: t.bg, border: '2px solid #0c1119', boxShadow: `0 0 0 1.5px ${t.ring}`,
+                        color: t.color, background: t.bg, border: '2px solid var(--surface-raised)', boxShadow: `0 0 0 1.5px ${t.ring}`,
                       }}
                     >
                       {init}
@@ -322,7 +313,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
                 })}
               </div>
               <span className="inline-flex items-center gap-[6px] font-semibold text-text-3" style={{ fontSize: 11 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#5eead4', animation: 'cbPulse 1.6s infinite' }} />
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)', animation: 'cbPulse 1.6s infinite' }} />
                 {peers.length} editing
               </span>
             </>
@@ -335,13 +326,13 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
             aria-pressed={note.starredByMe}
             aria-label={note.starredByMe ? 'Unstar this note' : 'Star this note'}
             title="Star this note"
-            className="grid cursor-pointer place-items-center border border-white/[0.07] hover:bg-white/[0.05]"
+            className="grid cursor-pointer place-items-center border border-hairline hover:bg-hover"
             style={{ width: 32, height: 32, minWidth: 44, minHeight: 44, borderRadius: 10 }}
           >
             <svg
               width="17" height="17" viewBox="0 0 24 24"
-              fill={note.starredByMe ? '#fbbf72' : 'none'}
-              stroke={note.starredByMe ? '#fbbf72' : '#8b97ab'}
+              fill={note.starredByMe ? 'var(--warning)' : 'none'}
+              stroke={note.starredByMe ? 'var(--warning)' : 'var(--text-3)'}
               strokeWidth={note.starredByMe ? '1.6' : '1.7'} strokeLinecap="round" strokeLinejoin="round"
             >
               <path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9z" />
@@ -355,11 +346,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
             className="flex cursor-pointer items-center gap-[7px] font-bold hover:brightness-[1.07]"
             style={{
               height: 32, minHeight: 44, padding: '0 14px', borderRadius: 10, fontSize: 12.5,
-              color: '#0a0f1a', background: 'var(--accent-grad)',
+              color: 'var(--text-on-accent)', background: 'var(--accent-grad)',
               boxShadow: '0 6px 16px -6px rgba(110,168,254,0.8)',
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0f1a" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="12" r="2.4" /><circle cx="18" cy="6" r="2.4" /><circle cx="18" cy="18" r="2.4" /><path d="M8.1 10.9l7.8-3.8M8.1 13.1l7.8 3.8" /></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-on-accent)" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="12" r="2.4" /><circle cx="18" cy="6" r="2.4" /><circle cx="18" cy="18" r="2.4" /><path d="M8.1 10.9l7.8-3.8M8.1 13.1l7.8 3.8" /></svg>
             Share
           </button>
 
@@ -372,7 +363,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               aria-label="More actions"
-              className="grid cursor-pointer place-items-center border border-white/[0.07] text-text-3 hover:bg-white/[0.05] hover:text-text-1"
+              className="grid cursor-pointer place-items-center border border-hairline text-text-3 hover:bg-hover hover:text-text-1"
               style={{ width: 32, height: 32, minWidth: 44, minHeight: 44, borderRadius: 10 }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
@@ -387,15 +378,15 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
               >
                 {actions.map((a, i) => (
                   <React.Fragment key={a.key}>
-                    {a.danger && <div style={{ height: 1, margin: '6px 8px', background: 'rgba(255,255,255,0.07)' }} />}
+                    {a.danger && <div style={{ height: 1, margin: '6px 8px', background: 'var(--hairline)' }} />}
                     <button
                       type="button"
                       role="menuitem"
                       onClick={a.onRun}
-                      className="flex w-full cursor-pointer items-center gap-[10px] rounded-[9px] text-left hover:bg-white/[0.06]"
+                      className="flex w-full cursor-pointer items-center gap-[10px] rounded-[9px] text-left hover:bg-hover"
                       style={{
                         padding: '9px 10px', minHeight: 40, fontSize: 13, fontWeight: 600,
-                        color: a.danger ? '#fb87a4' : '#cdd6e3',
+                        color: a.danger ? 'var(--danger)' : 'var(--text-2)',
                       }}
                     >
                       <span className="grid flex-none place-items-center" style={{ width: 18, height: 18 }}>{a.icon}</span>
@@ -446,7 +437,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
               <span
                 key={tag}
                 className="inline-flex items-center gap-[6px] font-mono text-text-3"
-                style={{ fontSize: 11, padding: '3px 9px', borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                style={{ fontSize: 11, padding: '3px 9px', borderRadius: 7, background: 'var(--bg-hover)', border: '1px solid var(--hairline)' }}
               >
                 {tag}
                 {!note.isLocked && (
@@ -474,7 +465,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
                 placeholder="add tag…"
                 aria-label="Add tag"
                 className="font-mono text-text-3 outline-none placeholder:text-text-4"
-                style={{ fontSize: 11, padding: '3px 9px', borderRadius: 7, background: 'transparent', border: '1px dashed rgba(255,255,255,0.12)', width: 110 }}
+                style={{ fontSize: 11, padding: '3px 9px', borderRadius: 7, background: 'transparent', border: '1px dashed var(--border-strong)', width: 110 }}
               />
             )}
           </div>
@@ -543,7 +534,7 @@ const SpacePickerDialog: React.FC<{
   return (
     <div
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
-      style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'rgba(4,6,11,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'var(--backdrop)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
     >
       <div
         ref={ref}
@@ -552,13 +543,13 @@ const SpacePickerDialog: React.FC<{
         className="animate-cb-up"
         style={{
           width: 'min(420px,92vw)', borderRadius: 18, overflow: 'hidden', padding: '22px 20px 18px',
-          background: 'linear-gradient(180deg,rgba(26,32,44,0.92),rgba(16,20,30,0.92))',
+          background: 'var(--modal-grad)',
           backdropFilter: 'blur(40px) saturate(170%)', WebkitBackdropFilter: 'blur(40px) saturate(170%)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          boxShadow: '0 40px 100px -30px rgba(0,0,0,0.9),inset 0 1px 0 rgba(255,255,255,0.08)',
+          border: '1px solid var(--modal-border)',
+          boxShadow: 'var(--modal-shadow)',
         }}
       >
-        <h2 className="m-0 font-extrabold" style={{ fontSize: 17, color: '#eef2f8', letterSpacing: '-0.01em' }}>Move to space</h2>
+        <h2 className="m-0 font-extrabold" style={{ fontSize: 17, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}>Move to space</h2>
         <div className="mt-[16px] flex max-h-[50vh] flex-col gap-[2px] overflow-y-auto">
           {spaces.map((sp) => {
             const isCurrent = sp.id === currentSpaceId;
@@ -570,8 +561,8 @@ const SpacePickerDialog: React.FC<{
                 type="button"
                 disabled={isCurrent}
                 onClick={() => onPick(sp.id)}
-                className="flex w-full cursor-pointer items-center gap-[11px] rounded-[10px] text-left hover:bg-white/[0.06] disabled:cursor-default disabled:opacity-50"
-                style={{ padding: '10px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, color: '#dbe2ec' }}
+                className="flex w-full cursor-pointer items-center gap-[11px] rounded-[10px] text-left hover:bg-hover disabled:cursor-default disabled:opacity-50"
+                style={{ padding: '10px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}
               >
                 <span style={{ width: 8, height: 8, borderRadius: 3, flex: '0 0 auto', background: sp.color, boxShadow: `0 0 10px ${hexa(sp.color, 0.6)}` }} />
                 <span className="flex-1">{sp.name}</span>
@@ -619,7 +610,7 @@ const VersionHistoryDialog: React.FC<{ noteId: string; onClose: () => void }> = 
   return (
     <div
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'rgba(4,6,11,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'var(--backdrop)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
     >
       <div
         ref={ref}
@@ -629,19 +620,19 @@ const VersionHistoryDialog: React.FC<{ noteId: string; onClose: () => void }> = 
         className="animate-cb-up"
         style={{
           width: 'min(460px,92vw)', borderRadius: 18, overflow: 'hidden', padding: '22px 20px 18px',
-          background: 'linear-gradient(180deg,rgba(26,32,44,0.92),rgba(16,20,30,0.92))',
+          background: 'var(--modal-grad)',
           backdropFilter: 'blur(40px) saturate(170%)', WebkitBackdropFilter: 'blur(40px) saturate(170%)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          boxShadow: '0 40px 100px -30px rgba(0,0,0,0.9),inset 0 1px 0 rgba(255,255,255,0.08)',
+          border: '1px solid var(--modal-border)',
+          boxShadow: 'var(--modal-shadow)',
         }}
       >
         <div className="flex items-center gap-2">
-          <h2 className="m-0 font-extrabold" style={{ fontSize: 17, color: '#eef2f8', letterSpacing: '-0.01em' }}>Version history</h2>
+          <h2 className="m-0 font-extrabold" style={{ fontSize: 17, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}>Version history</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="ml-auto grid place-items-center rounded-[8px] text-text-4 hover:bg-white/[0.06] hover:text-text-1"
+            className="ml-auto grid place-items-center rounded-[8px] text-text-4 hover:bg-hover hover:text-text-1"
             style={{ width: 28, height: 28 }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 3l8 8M11 3l-8 8" /></svg>
@@ -662,8 +653,8 @@ const VersionHistoryDialog: React.FC<{ noteId: string; onClose: () => void }> = 
               return (
                 <div key={e.id} className="flex items-center gap-[11px]" style={{ padding: '9px 4px' }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', flex: '0 0 auto', background: color }} />
-                  <div className="min-w-0 flex-1" style={{ fontSize: 13, color: '#cfd8e4' }}>
-                    <strong style={{ color: '#eef2f8' }}>{e.actorName}</strong> {e.verb}
+                  <div className="min-w-0 flex-1" style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                    <strong style={{ color: 'var(--text-strong)' }}>{e.actorName}</strong> {e.verb}
                   </div>
                   <span className="font-mono text-text-4" style={{ fontSize: 10.5 }}>{relativeTime(e.createdAt)}</span>
                 </div>
@@ -733,7 +724,7 @@ const AttachmentsSection: React.FC<{ noteId: string; locked: boolean; inputRef: 
             type="button"
             onClick={() => fileInput.current?.click()}
             disabled={uploading}
-            className="ml-auto flex cursor-pointer items-center gap-[6px] border border-white/[0.08] font-semibold text-text-2 hover:bg-white/[0.06] disabled:opacity-50"
+            className="ml-auto flex cursor-pointer items-center gap-[6px] border border-hairline font-semibold text-text-2 hover:bg-hover disabled:opacity-50"
             style={{ height: 30, minHeight: 44, padding: '0 12px', borderRadius: 9, fontSize: 12 }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
@@ -747,7 +738,7 @@ const AttachmentsSection: React.FC<{ noteId: string; locked: boolean; inputRef: 
       ) : items.length === 0 ? (
         <div
           className="font-mono text-text-4"
-          style={{ padding: 16, borderRadius: 13, border: '1px dashed rgba(255,255,255,0.12)', textAlign: 'center', fontSize: 11 }}
+          style={{ padding: 16, borderRadius: 13, border: '1px dashed var(--border-strong)', textAlign: 'center', fontSize: 11 }}
         >
           No attachments yet{locked ? '.' : ' — add a file to keep references with this note.'}
         </div>
@@ -759,7 +750,7 @@ const AttachmentsSection: React.FC<{ noteId: string; locked: boolean; inputRef: 
             return (
               <div
                 key={att.id}
-                className="flex items-center gap-[12px] border border-white/[0.07] bg-white/[0.035]"
+                className="flex items-center gap-[12px] border border-hairline bg-hover"
                 style={{ padding: '11px 14px', borderRadius: 12 }}
               >
                 <div

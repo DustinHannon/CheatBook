@@ -96,6 +96,7 @@ export interface ActivityEvent {
 export type Scope = 'all' | 'shared' | 'starred';
 export type FilterChip = 'all' | 'pinned' | 'starred' | 'runbooks';
 export type Density = 'compact' | 'balanced' | 'spacious';
+export type Theme = 'dark' | 'light';
 
 export interface NotificationPrefs {
   mentions: boolean;
@@ -110,6 +111,7 @@ export interface NotificationPrefs {
 export interface Appearance {
   accent: string;
   density: Density;
+  theme: Theme;
 }
 
 // Spaces whose notes count as "Runbooks" for the saved filter chip (data-driven,
