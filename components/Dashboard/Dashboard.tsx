@@ -62,7 +62,7 @@ const MiniAvatar: React.FC<{ member: Member }> = ({ member }) => (
 export const Dashboard: React.FC = () => {
   const router = useRouter();
   const {
-    loading, me, notes, spaces, activity, memberById, createNote, openNav,
+    loading, me, notes, spaces, activity, memberById, createNote, openNav, isPending,
   } = useApp();
   const { onlineCount } = usePresence();
   const { isMobile, isTablet } = useViewport();
@@ -120,6 +120,94 @@ export const Dashboard: React.FC = () => {
   const statCols = isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)';
   const dashCols = isMobile || isTablet ? '1fr' : '1.3fr 1fr';
   const dashPad = isMobile ? '22px 16px 48px' : '34px 40px 60px';
+
+  // ── Pending state ─────────────────────────────────────────────────────
+  // Authed but not yet on the team (awaiting an admin add). RLS returns no
+  // notes/spaces/members, so the normal tiles would be empty and meaningless —
+  // show only a welcome/pending card on the glass shell instead.
+  if (isPending) {
+    return (
+      <section
+        className="cb-panel relative flex min-h-0 w-full flex-col overflow-y-auto"
+        style={{ borderRadius: 20 }}
+        aria-label="Dashboard"
+      >
+        <div style={{ maxWidth: 1080, width: '100%', margin: '0 auto', padding: dashPad }}>
+          {isMobile && (
+            <button
+              type="button"
+              onClick={openNav}
+              aria-label="Open navigation"
+              className="mb-[22px] grid flex-none cursor-pointer place-items-center text-text-2 hover:bg-hover"
+              style={{ width: 44, height: 44, borderRadius: 9, border: '1px solid var(--hairline)' }}
+            >
+              <MenuIcon />
+            </button>
+          )}
+          <div
+            className="mx-auto flex flex-col items-center text-center"
+            style={{
+              maxWidth: 520,
+              marginTop: isMobile ? 8 : 56,
+              padding: isMobile ? '32px 22px' : '44px 40px',
+              borderRadius: 18,
+              background: 'var(--bg-hover)',
+              border: '1px solid var(--hairline)',
+            }}
+          >
+            <div
+              className="grid place-items-center"
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 18,
+                marginBottom: 22,
+                color: 'var(--accent)',
+                background: 'var(--accent-soft)',
+                border: '1px solid rgba(110,168,254,0.32)',
+              }}
+            >
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="8" r="3.2" />
+                <path d="M3 19a6 6 0 0 1 12 0" />
+                <path d="M17 11h4" />
+                <path d="M19 9v4" />
+              </svg>
+            </div>
+            <div
+              className="font-mono"
+              style={{ fontSize: 11, letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: 12 }}
+            >
+              CHEATBOOK / ACCESS PENDING
+            </div>
+            <h1 className="m-0 text-text" style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em' }}>
+              You&apos;re not on the team yet
+            </h1>
+            <p
+              style={{
+                margin: '14px 0 0',
+                fontSize: 14,
+                lineHeight: 1.6,
+                color: 'var(--text-3)',
+                maxWidth: 420,
+              }}
+            >
+              An admin needs to add you to CheatBook before you can see notes and spaces.
+              Check back once you&apos;ve been approved.
+            </p>
+            {me?.name && (
+              <div
+                className="font-mono"
+                style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 20 }}
+              >
+                Signed in as {me.name}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section

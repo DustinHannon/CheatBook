@@ -13,10 +13,11 @@ import { AccountSection } from './AccountSection';
 import { NotificationsSection } from './NotificationsSection';
 import { AppearanceSection } from './AppearanceSection';
 import { SecuritySection } from './SecuritySection';
+import { UsersSection } from './UsersSection';
 
 // ─── Export contract ──────────────────────────────────────────────────
-export type SettingsSection = 'profile' | 'account' | 'notifications' | 'appearance' | 'security';
-export const SETTINGS_SECTIONS = ['profile', 'account', 'notifications', 'appearance', 'security'] as const;
+export type SettingsSection = 'profile' | 'account' | 'notifications' | 'appearance' | 'security' | 'users';
+export const SETTINGS_SECTIONS = ['profile', 'account', 'notifications', 'appearance', 'security', 'users'] as const;
 
 const supabase = createClient();
 
@@ -57,13 +58,27 @@ const NAV: NavItem[] = [
     label: 'Security',
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l8 4v5c0 5-3.4 8.5-8 11-4.6-2.5-8-6-8-11V6z" /></svg>,
   },
+  {
+    key: 'users',
+    label: 'Users',
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.1" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" /><path d="M16 5.2a3 3 0 0 1 0 5.6" /><path d="M17.5 19a5.5 5.5 0 0 0-3-4.9" /></svg>,
+  },
 ];
 
 /** Full-height Settings layout: aurora + top bar + glass section nav + content panel. */
 export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) => {
   const router = useRouter();
-  const { me, loading, refreshMe } = useApp();
+  const { me, loading, refreshMe, isAdmin } = useApp();
   const { showToast } = useToast();
+
+  // URL guard: non-admins must not reach the admin-only Users section by URL.
+  // Wait for me to resolve before deciding, so a slow role read doesn't bounce
+  // an admin off mid-load. Once loaded, a non-admin on 'users' is redirected.
+  useEffect(() => {
+    if (section === 'users' && !loading && me && !isAdmin) {
+      router.replace('/settings/profile');
+    }
+  }, [section, loading, me, isAdmin, router]);
 
   // Local avatar override for instant feedback after an upload (AppContext
   // doesn't re-fetch members on a profile change, only on notebook changes).
@@ -266,7 +281,7 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
             ACCOUNT
           </div>
           <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }} aria-label="Settings sections">
-            {NAV.map((item) => {
+            {NAV.filter((n) => n.key !== 'users' || isAdmin).map((item) => {
               const active = item.key === section;
               return (
                 <button
@@ -361,6 +376,7 @@ export const Settings: React.FC<{ section: SettingsSection }> = ({ section }) =>
                 )}
                 {section === 'appearance' && <AppearanceSection />}
                 {section === 'security' && <SecuritySection supabase={supabase} />}
+                {section === 'users' && (isAdmin ? <UsersSection /> : <SettingsLoading />)}
               </>
             )}
           </div>

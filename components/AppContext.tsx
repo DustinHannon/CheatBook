@@ -14,6 +14,8 @@ import type { Member, Space, Note, ActivityEvent } from '../lib/types';
 type AppContextType = {
   loading: boolean;
   teamId: string | null;
+  isPending: boolean;         // authed but not yet on a team (awaiting admin add)
+  isAdmin: boolean;           // current member's role is 'admin'
   me: Member | null;
   members: Member[];          // with live `online` flag merged in
   spaces: Space[];
@@ -279,9 +281,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const starredCount = useMemo(() => notes.filter((n) => n.starredByMe).length, [notes]);
 
+  // Pending: authenticated but the initial load finished with no team. Admin:
+  // current member carries the 'admin' role. Both gate the Users management UI
+  // and the pending-onboarding state.
+  const isPending = !loading && isAuthenticated && !teamId;
+  const isAdmin = me?.role === 'admin';
+
   return (
     <AppContext.Provider value={{
-      loading, teamId, me, members, spaces, notes, activity,
+      loading, teamId, isPending, isAdmin, me, members, spaces, notes, activity,
       paletteOpen, accountOpen, navOpen,
       openPalette: () => setPaletteOpen(true),
       closePalette: () => setPaletteOpen(false),

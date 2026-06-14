@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   Space, Member, Note, Attachment, ShareGrant, LinkShare, ActivityEvent,
-  Permission, NotificationPrefs, Appearance,
+  Permission, NotificationPrefs, Appearance, UserAccount,
 } from './types';
 import { initials, colorForId } from './colors';
 import { snippetFromDoc, docToText, docHasImage, emptyDoc, legacyToDoc } from './blocks';
@@ -69,6 +69,51 @@ export async function getCurrentMember(supabase: DB): Promise<Member> {
     role = tm?.role || 'member';
   }
   return mapMember(data, role);
+}
+
+// ─── Users (admin) ────────────────────────────────────────────────────
+// Admin-only roster: admins read ALL profiles (incl. pending) via RLS; everyone
+// else reads same-team only. Role/team come from the joined team_members row.
+export async function getAllUsers(supabase: DB): Promise<UserAccount[]> {
+  try {
+    const { data, error } = await supabase.from('profiles').select('*, team_members(role)');
+    if (error) throw error;
+    return (data || [])
+      .map((p: any): UserAccount => {
+        const email = p.email || '';
+        const role = (p.team_members?.[0]?.role ?? null) as 'admin' | 'member' | null;
+        return {
+          id: p.id,
+          name: p.name || (email ? email.split('@')[0] : 'Unknown'),
+          email,
+          username: p.username || (email ? email.split('@')[0] : ''),
+          initials: initials(p.name || email),
+          color: p.color || colorForId(p.id),
+          avatarUrl: p.avatar ?? null,
+          role,
+          teamId: p.team_id ?? null,
+          pending: p.team_id == null,
+          createdAt: p.created_at ?? null,
+        };
+      })
+      // Pending users first, then alphabetical by name.
+      .sort((a, b) => (Number(b.pending) - Number(a.pending)) || a.name.localeCompare(b.name));
+  } catch { return []; }
+}
+
+export async function addUserToTeam(supabase: DB, userId: string, role: 'admin' | 'member' = 'member'): Promise<void> {
+  const { error } = await supabase.rpc('admin_add_user_to_team', { p_user_id: userId, p_role: role });
+  if (error) throw error;
+}
+
+export async function removeUserFromTeam(supabase: DB, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_remove_user_from_team', { p_user_id: userId });
+  if (error) throw error;
+}
+
+export async function setUserRole(supabase: DB, userId: string, role: 'admin' | 'member'): Promise<void> {
+  const { error } = await supabase.rpc('admin_set_user_role', { p_user_id: userId, p_role: role });
+  if (error) throw error;
 }
 
 // ─── Spaces (notebooks) ───────────────────────────────────────────────

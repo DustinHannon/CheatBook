@@ -28,6 +28,22 @@ export interface Member {
   online: boolean;      // derived from presence channel, never DB
 }
 
+// Admin-facing account row: a profile + its team membership/role. Distinct from
+// `Member` (team-scoped, presence-aware) — UserAccount spans pending users too.
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  username: string;
+  initials: string;
+  color: string;
+  avatarUrl: string | null;
+  role: 'admin' | 'member' | null;
+  teamId: string | null;
+  pending: boolean;             // true while team_id is null (awaiting admin add)
+  createdAt?: string | null;
+}
+
 // TipTap/ProseMirror JSON document is the canonical note body.
 export type NoteBody = Json;
 
