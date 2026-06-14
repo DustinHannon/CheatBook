@@ -7,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
@@ -20,7 +22,6 @@ export type Database = {
           target_id: string | null
           target_title: string | null
           target_type: string | null
-          team_id: string
           user_id: string | null
         }
         Insert: {
@@ -30,7 +31,6 @@ export type Database = {
           target_id?: string | null
           target_title?: string | null
           target_type?: string | null
-          team_id: string
           user_id?: string | null
         }
         Update: {
@@ -40,16 +40,50 @@ export type Database = {
           target_id?: string | null
           target_title?: string | null
           target_type?: string | null
-          team_id?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hidden_notes: {
-        Row: { hidden_at: string | null; note_id: string; user_id: string }
-        Insert: { hidden_at?: string | null; note_id: string; user_id: string }
-        Update: { hidden_at?: string | null; note_id?: string; user_id?: string }
-        Relationships: []
+        Row: {
+          hidden_at: string | null
+          note_id: string
+          user_id: string
+        }
+        Insert: {
+          hidden_at?: string | null
+          note_id: string
+          user_id: string
+        }
+        Update: {
+          hidden_at?: string | null
+          note_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hidden_notes_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hidden_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       images: {
         Row: {
@@ -79,7 +113,15 @@ export type Database = {
           note_id?: string
           size?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "images_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       note_attachments: {
         Row: {
@@ -118,25 +160,55 @@ export type Database = {
           uploaded_by?: string | null
           url?: string
         }
-        Relationships: []
-      }
-      note_collaborators: {
-        Row: { created_at: string; note_id: string; permission: string; user_id: string }
-        Insert: { created_at?: string; note_id: string; permission?: string; user_id: string }
-        Update: { created_at?: string; note_id?: string; permission?: string; user_id?: string }
-        Relationships: []
-      }
-      note_link_shares: {
-        Row: { enabled: boolean; note_id: string; permission: string; scope: string; updated_at: string }
-        Insert: { enabled?: boolean; note_id: string; permission?: string; scope?: string; updated_at?: string }
-        Update: { enabled?: boolean; note_id?: string; permission?: string; scope?: string; updated_at?: string }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "note_attachments_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       note_stars: {
-        Row: { created_at: string; note_id: string; user_id: string }
-        Insert: { created_at?: string; note_id: string; user_id: string }
-        Update: { created_at?: string; note_id?: string; user_id?: string }
-        Relationships: []
+        Row: {
+          created_at: string
+          note_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          note_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          note_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_stars_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_stars_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notebooks: {
         Row: {
@@ -147,7 +219,6 @@ export type Database = {
           id: string
           owner_id: string
           sort_order: number
-          team_id: string | null
           title: string
           updated_at: string | null
         }
@@ -159,7 +230,6 @@ export type Database = {
           id?: string
           owner_id: string
           sort_order?: number
-          team_id?: string | null
           title: string
           updated_at?: string | null
         }
@@ -171,11 +241,18 @@ export type Database = {
           id?: string
           owner_id?: string
           sort_order?: number
-          team_id?: string | null
           title?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notebooks_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notes: {
         Row: {
@@ -232,91 +309,262 @@ export type Database = {
           updated_at?: string | null
           version?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notes_last_edited_by_fkey"
+            columns: ["last_edited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_locked_by_fkey"
+            columns: ["locked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "notebooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
           appearance: Json
+          approved: boolean
           avatar: string | null
           color: string | null
           created_at: string | null
           email: string
           id: string
+          is_admin: boolean
           last_login: string | null
           name: string | null
           notification_prefs: Json
           pronouns: string | null
           status: string | null
-          team_id: string | null
           team_name: string | null
           title: string | null
           username: string | null
         }
         Insert: {
           appearance?: Json
+          approved?: boolean
           avatar?: string | null
           color?: string | null
           created_at?: string | null
           email: string
           id: string
+          is_admin?: boolean
           last_login?: string | null
           name?: string | null
           notification_prefs?: Json
           pronouns?: string | null
           status?: string | null
-          team_id?: string | null
           team_name?: string | null
           title?: string | null
           username?: string | null
         }
         Update: {
           appearance?: Json
+          approved?: boolean
           avatar?: string | null
           color?: string | null
           created_at?: string | null
           email?: string
           id?: string
+          is_admin?: boolean
           last_login?: string | null
           name?: string | null
           notification_prefs?: Json
           pronouns?: string | null
           status?: string | null
-          team_id?: string | null
           team_name?: string | null
           title?: string | null
           username?: string | null
         }
         Relationships: []
       }
-      team_members: {
-        Row: { created_at: string | null; role: string; team_id: string; user_id: string }
-        Insert: { created_at?: string | null; role?: string; team_id: string; user_id: string }
-        Update: { created_at?: string | null; role?: string; team_id?: string; user_id?: string }
-        Relationships: []
-      }
-      teams: {
-        Row: { created_at: string | null; id: string; invite_code: string | null; name: string }
-        Insert: { created_at?: string | null; id?: string; invite_code?: string | null; name: string }
-        Update: { created_at?: string | null; id?: string; invite_code?: string | null; name?: string }
-        Relationships: []
-      }
       yjs_documents: {
-        Row: { note_id: string; state: string | null; updated_at: string }
-        Insert: { note_id: string; state?: string | null; updated_at?: string }
-        Update: { note_id?: string; state?: string | null; updated_at?: string }
-        Relationships: []
+        Row: {
+          note_id: string
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          note_id: string
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          note_id?: string
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yjs_documents_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: true
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
-    Views: { [_ in never]: never }
-    Functions: {
-      create_team_with_owner: { Args: { team_name: string }; Returns: string }
-      invite_member_by_email: { Args: { p_email: string }; Returns: undefined }
-      is_team_admin: { Args: { p_team_id: string }; Returns: boolean }
-      join_team_by_code: { Args: { code: string }; Returns: string }
-      remove_team_member: { Args: { p_user_id: string }; Returns: undefined }
-      set_member_role: { Args: { p_role: string; p_user_id: string }; Returns: undefined }
+    Views: {
+      [_ in never]: never
     }
-    Enums: { [_ in never]: never }
-    CompositeTypes: { [_ in never]: never }
+    Functions: {
+      admin_approve_user: { Args: { p_user_id: string }; Returns: undefined }
+      admin_revoke_user: { Args: { p_user_id: string }; Returns: undefined }
+      admin_set_admin: {
+        Args: { p_is_admin: boolean; p_user_id: string }
+        Returns: undefined
+      }
+      is_app_admin: { Args: never; Returns: boolean }
+      is_approved: { Args: never; Returns: boolean }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const

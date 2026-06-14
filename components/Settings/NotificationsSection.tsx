@@ -22,7 +22,6 @@ const GROUPS: NotifGroup[] = [
     items: [
       { key: 'mentions', label: 'Mentions', desc: 'When someone @mentions you in a note or comment' },
       { key: 'comments', label: 'Comments', desc: 'Replies on notes you own or follow' },
-      { key: 'shared', label: 'Shared with you', desc: 'When a teammate shares a note or space' },
       { key: 'incident', label: 'Incident assignments', desc: 'When you are added to an active incident' },
     ],
   },

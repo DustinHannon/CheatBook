@@ -57,6 +57,49 @@ const CodeBlock = CodeBlockLowlight.extend({
   addNodeView() { return ReactNodeViewRenderer(CodeBlockView); },
 }).configure({ lowlight });
 
+// Inline-image node view. Images live in the PRIVATE bucket and render through the
+// auth-checked /api/file proxy, which can 401/403/404 mid-session (expired session,
+// revoked approval, deleted object) where a public URL never could. Without this,
+// such a failure shows the browser's native broken-image glyph; here onError swaps
+// in a themed placeholder instead. The <img> keeps the .cb-prose img styling.
+const ImageView: React.FC<NodeViewProps> = ({ node, selected }) => {
+  const [errored, setErrored] = useState(false);
+  const src = (node.attrs.src as string) || '';
+  const alt = (node.attrs.alt as string) || '';
+  return (
+    <NodeViewWrapper as="div" data-drag-handle style={{ display: 'block' }}>
+      {errored ? (
+        <div
+          contentEditable={false}
+          className="cb-mono"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', margin: '0 0 18px',
+            border: '1px dashed var(--hairline)', borderRadius: 12, background: 'var(--bg-hover)',
+            color: 'var(--text-4)', fontSize: 12,
+            outline: selected ? '2px solid var(--accent)' : undefined,
+          }}
+        >
+          <ImageIcon size={16} />
+          <span>{alt ? `Image unavailable — ${alt}` : 'Image unavailable — sign in again or check your access.'}</span>
+        </div>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={alt}
+          draggable={false}
+          onError={() => setErrored(true)}
+          style={selected ? { outline: '2px solid var(--accent)' } : undefined}
+        />
+      )}
+    </NodeViewWrapper>
+  );
+};
+
+const ImageBlock = Image.extend({
+  addNodeView() { return ReactNodeViewRenderer(ImageView); },
+}).configure({ inline: false });
+
 export interface EditorPeer { id: string; name: string; color: string }
 
 interface NoteEditorProps {
@@ -133,7 +176,7 @@ const EditorInner: React.FC<InnerProps> = ({
       CodeBlock,
       TaskList,
       TaskItem.configure({ nested: true }),
-      Image.configure({ inline: false }),
+      ImageBlock,
       Placeholder.configure({ placeholder: 'Start writing — or add a block below…' }),
       Collaboration.configure({ document: ydoc }),
       CollaborationCaret.configure({

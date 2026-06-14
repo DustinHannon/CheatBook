@@ -358,6 +358,19 @@ export function fileUrl(path: string): string {
   return '/api/file?path=' + encodeURIComponent(path);
 }
 
+// Guard an attachment/file URL before it is rendered as an <a href>. Attachment
+// rows are writable by any approved user under RLS, so a tampered `url` could
+// carry a javascript:/data: scheme that executes in a viewer's session on click
+// (stored XSS). Only allow the same-origin proxy path or an http(s) URL; anything
+// else collapses to '#'. The DB also constrains the column, but this is the
+// render-boundary backstop.
+export function safeFileHref(url: string | null | undefined): string {
+  if (!url) return '#';
+  if (url.startsWith('/api/file?')) return url;
+  if (/^https?:\/\//i.test(url)) return url;
+  return '#';
+}
+
 // Recover the raw storage object path from a proxy url produced by fileUrl().
 function storagePathFromUrl(url: string | null | undefined): string | null {
   if (!url) return null;

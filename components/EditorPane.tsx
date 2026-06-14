@@ -9,7 +9,7 @@ import { docToMarkdown } from '../lib/blocks';
 import { createClient } from '../lib/supabase/client';
 import {
   updateNoteMeta, duplicateNote, getActivity, setLocked,
-  getAttachments, uploadAttachment, deleteAttachment,
+  getAttachments, uploadAttachment, deleteAttachment, safeFileHref,
 } from '../lib/api';
 import { NoteEditor, type EditorPeer } from './NoteEditor';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -743,7 +743,7 @@ const AttachmentsSection: React.FC<{ noteId: string; locked: boolean; inputRef: 
                   </div>
                 </div>
                 <a
-                  href={att.url}
+                  href={safeFileHref(att.url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   download={att.fileName}

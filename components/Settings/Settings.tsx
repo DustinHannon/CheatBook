@@ -22,7 +22,7 @@ export const SETTINGS_SECTIONS = ['profile', 'account', 'notifications', 'appear
 const supabase = createClient();
 
 const DEFAULT_PREFS: NotificationPrefs = {
-  mentions: true, comments: true, shared: true, incident: true,
+  mentions: true, comments: true, incident: true,
   digest: false, desktop: false, sounds: false,
 };
 

@@ -102,7 +102,6 @@ export type Theme = 'dark' | 'light';
 export interface NotificationPrefs {
   mentions: boolean;
   comments: boolean;
-  shared: boolean;
   incident: boolean;
   digest: boolean;
   desktop: boolean;
