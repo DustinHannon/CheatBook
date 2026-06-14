@@ -8,7 +8,22 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Image from '@tiptap/extension-image';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { common, createLowlight } from 'lowlight';
+import { createLowlight } from 'lowlight';
+// Register only the grammars an IT/Eng team actually pastes, instead of all ~37
+// from lowlight's `common` bundle — trims a large chunk off the editor bundle.
+// Unregistered languages fall back to highlightAuto, so nothing breaks.
+import bash from 'highlight.js/lib/languages/bash';
+import powershell from 'highlight.js/lib/languages/powershell';
+import sql from 'highlight.js/lib/languages/sql';
+import json from 'highlight.js/lib/languages/json';
+import yaml from 'highlight.js/lib/languages/yaml';
+import javascript from 'highlight.js/lib/languages/javascript';
+import typescript from 'highlight.js/lib/languages/typescript';
+import python from 'highlight.js/lib/languages/python';
+import ini from 'highlight.js/lib/languages/ini';
+import diff from 'highlight.js/lib/languages/diff';
+import xml from 'highlight.js/lib/languages/xml';
+import plaintext from 'highlight.js/lib/languages/plaintext';
 import * as Y from 'yjs';
 import { Bold, ListChecks, Code2, ImageIcon, Paperclip, Copy as CopyIcon, Check } from 'lucide-react';
 import { createClient } from '../lib/supabase/client';
@@ -18,7 +33,12 @@ import { useToast } from './Toast';
 import type { Note, Member } from '../lib/types';
 
 const supabase = createClient();
-const lowlight = createLowlight(common);
+const lowlight = createLowlight();
+lowlight.register({
+  bash, sh: bash, shell: bash, powershell, ps1: powershell, sql, json, yaml, yml: yaml,
+  javascript, js: javascript, typescript, ts: typescript, python, py: python,
+  ini, toml: ini, diff, xml, html: xml, plaintext, text: plaintext,
+});
 
 // Code-block node view: reference header (window dots + language + Copy) around
 // the highlighted <pre>. Copy reads the node's text to the clipboard.

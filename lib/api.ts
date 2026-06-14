@@ -34,6 +34,7 @@ function mapMember(p: any, role = 'member'): Member {
     team: p.team_name ?? null,
     status: p.status ?? null,
     avatarUrl: p.avatar ?? null,
+    approved: !!p.approved,
     role,
     online: false,
   };
@@ -155,8 +156,13 @@ export async function deleteSpace(supabase: DB, spaceId: string): Promise<void> 
 }
 
 // ─── Notes ────────────────────────────────────────────────────────────
+// Explicit column list (NOT '*') — the list/cards never read `content` (the
+// plaintext search mirror, ~300 kB across all notes) so we don't ship it to the
+// browser; PostgREST still filters on it server-side in searchNotes regardless of
+// the projection. `body` stays (the editor seeds the Yjs doc from the in-memory
+// note.body). Drops ~35% off the notes-list payload.
 const NOTE_SELECT =
-  '*, notebooks(id,title,color), owner:owner_id(name), editor:last_edited_by(name), note_attachments(count)';
+  'id,notebook_id,title,owner_id,body,snippet,tags,is_pinned,is_locked,locked_by,last_edited_by,created_at,updated_at,stale_since, notebooks(id,title,color), owner:owner_id(name), editor:last_edited_by(name), note_attachments(count)';
 
 // Coerce a stored note body into a valid TipTap doc. Guards against the column
 // default ('[]' array), legacy HTML strings, and malformed jsonb so the editor

@@ -22,6 +22,7 @@ export interface Member {
   team: string | null;  // team_name (free text)
   status: string | null;
   avatarUrl: string | null;
+  approved: boolean;    // platform access (profiles.approved)
   role: string;         // 'admin' | 'member', sourced from profiles.is_admin
   online: boolean;      // derived from presence channel, never DB
 }

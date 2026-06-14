@@ -78,6 +78,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const spacesRef = useRef<Space[]>([]);
   useEffect(() => { notesRef.current = notes; }, [notes]);
   useEffect(() => { spacesRef.current = spaces; }, [spaces]);
+  // Current user id for the realtime effect (without taking `me` as a dep, which
+  // would tear down + re-subscribe the channel on every profile change).
+  const meIdRef = useRef<string | null>(null);
+  useEffect(() => { meIdRef.current = me?.id ?? null; }, [me]);
 
   const refreshNotes = useCallback(async () => {
     if (!approvedRef.current) return;
@@ -113,26 +117,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     (async () => {
       setLoading(true);
       try {
-        // Access is the binary `approved` flag on the profile.
-        const { data: profile } = await supabase
-          .from('profiles').select('approved').eq('id', user.id).single();
+        // One profile read does double duty: it IS the current Member AND carries
+        // the binary `approved` flag — no separate pre-flight round-trip, and the
+        // current-user profile is no longer fetched twice.
+        const meMember = await getCurrentMember(supabase);
         if (cancelled) return;
-        const isApproved = !!profile?.approved;
+        const isApproved = meMember.approved;
         approvedRef.current = isApproved;
         setApproved(isApproved);
-        const [meRes, membersRes, spacesRes, notesRes, activityRes] = await Promise.allSettled([
-          getCurrentMember(supabase),
-          isApproved ? getMembers(supabase) : Promise.resolve([]),
-          isApproved ? getSpaces(supabase) : Promise.resolve([]),
-          isApproved ? getNotes(supabase) : Promise.resolve([]),
-          isApproved ? getActivity(supabase) : Promise.resolve([]),
+        setMe(meMember);
+        const [membersRes, spacesRes, notesRes, activityRes] = await Promise.allSettled([
+          isApproved ? getMembers(supabase) : Promise.resolve([] as Member[]),
+          isApproved ? getSpaces(supabase) : Promise.resolve([] as Space[]),
+          isApproved ? getNotes(supabase) : Promise.resolve([] as Note[]),
+          isApproved ? getActivity(supabase) : Promise.resolve([] as ActivityEvent[]),
         ]);
         if (cancelled) return;
-        if (meRes.status === 'fulfilled') setMe(meRes.value);
         if (membersRes.status === 'fulfilled') setRawMembers(membersRes.value);
         if (spacesRes.status === 'fulfilled') setSpaces(spacesRes.value);
         if (notesRes.status === 'fulfilled') setNotes(notesRes.value);
         if (activityRes.status === 'fulfilled') setActivity(activityRes.value);
+      } catch {
+        // getCurrentMember failed (rare: missing profile / transient) — leave state.
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -147,24 +153,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // approval so unapproved users don't subscribe.
   useEffect(() => {
     if (!approved) return;
-    let t: ReturnType<typeof setTimeout> | null = null;
+    let tn: ReturnType<typeof setTimeout> | null = null;
+    let ta: ReturnType<typeof setTimeout> | null = null;
     let tp: ReturnType<typeof setTimeout> | null = null;
-    const bumpNotes = () => {
-      if (t) clearTimeout(t);
-      t = setTimeout(() => { refreshNotes(); refreshSpaces(); refreshActivity(); }, 400);
-    };
     const bumpProfiles = () => {
       if (tp) clearTimeout(tp);
-      tp = setTimeout(() => { refreshMembers(); refreshMe(); }, 400);
+      tp = setTimeout(() => { refreshMembers(); refreshMe(); }, 600);
     };
     const channel = supabase
       .channel(PLATFORM_CHANNEL)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, bumpNotes)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, () => { if (t) clearTimeout(t); t = setTimeout(() => refreshActivity(), 400); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, (payload) => {
+        // Skip the editing user's OWN autosave UPDATEs: they already hold the
+        // latest body via Yjs and an UPDATE changes no note count. Without this,
+        // every 2s autosave fired a full 338-note refetch storm while typing.
+        const ev = (payload as { eventType?: string }).eventType;
+        const editedBy = (payload as { new?: { last_edited_by?: string } }).new?.last_edited_by;
+        if (ev === 'UPDATE' && editedBy === meIdRef.current) return;
+        if (tn) clearTimeout(tn);
+        tn = setTimeout(() => {
+          refreshNotes();
+          if (ev === 'INSERT' || ev === 'DELETE') refreshSpaces(); // counts only change on add/remove
+        }, 1200);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, () => {
+        if (ta) clearTimeout(ta);
+        ta = setTimeout(() => refreshActivity(), 1200);
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notebooks' }, () => { refreshSpaces(); })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, bumpProfiles)
       .subscribe();
-    return () => { if (t) clearTimeout(t); if (tp) clearTimeout(tp); supabase.removeChannel(channel); };
+    return () => { if (tn) clearTimeout(tn); if (ta) clearTimeout(ta); if (tp) clearTimeout(tp); supabase.removeChannel(channel); };
   }, [approved, refreshNotes, refreshActivity, refreshSpaces, refreshMembers, refreshMe]);
 
   // Merge live presence into members + me.
