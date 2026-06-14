@@ -66,9 +66,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       commitUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       commitUser(session?.user ? mapUser(session.user) : null);
       setIsLoading(false);
+      // After an Entra (Azure) sign-in, mirror the user's Microsoft 365 profile
+      // photo into their avatar. provider_token is only present on the fresh OAuth
+      // session (never on a restored/refreshed one), so this runs once per sign-in
+      // and is best-effort — it must never block the auth flow.
+      if (event === 'SIGNED_IN' && session?.provider_token) {
+        void fetch('/api/entra-avatar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ providerToken: session.provider_token }),
+        }).catch(() => { /* ignore — avatar sync is non-critical */ });
+      }
     });
     return () => subscription.unsubscribe();
   }, [commitUser]);
@@ -78,7 +89,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error('Microsoft Entra SSO is not configured yet. Use a break-glass account below.');
     }
     const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined;
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'azure', options: { redirectTo, scopes: 'email openid profile' } });
+    // `User.Read` lets us pull the user's Microsoft 365 profile photo from Graph
+    // after sign-in (see pages/api/entra-avatar.ts); the rest are standard OIDC.
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'azure', options: { redirectTo, scopes: 'email openid profile User.Read' } });
     if (error) throw new Error(error.message);
   }, []);
 
