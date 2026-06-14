@@ -1,12 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 import type { Scope, FilterChip, Note } from '../lib/types';
 import { RUNBOOK_SPACE_NAMES } from '../lib/types';
 import { useApp } from './AppContext';
 import { useToast } from './Toast';
 import { NoteList } from './NoteList';
-import { EditorPane } from './EditorPane';
 import { Skeleton } from './ui/Skeleton';
+
+// The editor (TipTap + Yjs + lowlight) is the heaviest chunk in the app. Load it
+// lazily so the notes LIST route doesn't ship it; NoteCard prefetches it on hover
+// so opening a note stays instant. Client-only (ssr:false) — it already is.
+const EditorPane = dynamic(() => import('./EditorPane').then((m) => m.EditorPane), {
+  ssr: false,
+  loading: () => (
+    <section className="cb-panel flex min-h-0 flex-col items-center justify-center" style={{ borderRadius: 20, padding: 40 }} aria-busy="true">
+      <div className="text-sm text-text-3">Opening note…</div>
+    </section>
+  ),
+});
 
 interface WorkspaceProps {
   scope: Scope;

@@ -13,6 +13,10 @@ interface NoteCardProps {
 
 const STAR_AMBER = 'var(--warning)';
 
+// Warm the lazily code-split editor chunk on hover so clicking a note opens
+// instantly (the editor is dynamic-imported off the list route in Workspace).
+const prefetchEditor = () => { void import('./EditorPane'); };
+
 /**
  * One note in the workspace list. Markup lifted verbatim from the note-card
  * block in designideas/design-references/CheatBook.dc.html (lines 194–220):
@@ -70,6 +74,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, selected, onSelect }) 
       aria-current={selected ? 'true' : undefined}
       aria-label={note.title}
       onClick={onSelect}
+      onMouseEnter={prefetchEditor}
       onKeyDown={onCardKey}
       className="group relative flex-none cursor-pointer overflow-hidden border border-hairline bg-hover transition hover:border-strong hover:bg-hover-2"
       style={{ padding: '13px 14px', borderRadius: 14 }}

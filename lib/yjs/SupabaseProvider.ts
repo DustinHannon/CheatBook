@@ -63,6 +63,10 @@ export class SupabaseYjsProvider {
 
   private async connect() {
     this.setStatus('connecting');
+    // Start the cold-load in parallel with the channel JOIN handshake so the
+    // yjs_documents round-trip isn't serialized AFTER SUBSCRIBED — it shaves the
+    // DB latency off the critical path before the editor can seed/show content.
+    const persistedPromise = loadYjsState(this.supabase, this.noteId).catch(() => null);
     this.channel
       .on('broadcast', { event: 'yjs-update' }, ({ payload }) => {
         if (this.destroyed) return;
@@ -87,9 +91,9 @@ export class SupabaseYjsProvider {
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           this.joined = true;
-          // Cold-load persisted CRDT state, then reconcile with live peers.
+          // Apply the already-in-flight cold-load, then reconcile with live peers.
           try {
-            const persisted = await loadYjsState(this.supabase, this.noteId);
+            const persisted = await persistedPromise;
             if (persisted) Y.applyUpdate(this.doc, persisted, this);
           } catch { /* fresh doc */ }
           this.flushOutbox();
