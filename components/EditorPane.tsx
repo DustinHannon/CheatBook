@@ -77,6 +77,14 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
   const [title, setTitle] = useState(note.title);
   useEffect(() => { setTitle(note.title); }, [note.id, note.title]);
 
+  // The title is a textarea (not an input) so long titles WRAP instead of being
+  // clipped; grow its height to fit the wrapped lines.
+  const titleRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    const el = titleRef.current;
+    if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }
+  }, [title]);
+
   const commitTitle = useCallback(async () => {
     const next = title.trim() || 'Untitled note';
     if (next === note.title) return;
@@ -354,7 +362,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
                 role="menu"
                 aria-label="Note actions"
                 className="cb-panel absolute z-[80] animate-cb-up"
-                style={{ right: 0, top: 'calc(100% + 8px)', width: 222, borderRadius: 14, padding: 6 }}
+                style={{ right: 0, top: 'calc(100% + 8px)', width: 222, borderRadius: 14, padding: 6, background: 'var(--surface-raised)' }}
               >
                 {actions.map((a, i) => (
                   <React.Fragment key={a.key}>
@@ -398,16 +406,18 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
             </span>
           </div>
 
-          {/* editable title (H1) */}
-          <input
+          {/* editable title (H1) — textarea so long titles wrap, not clip */}
+          <textarea
+            ref={titleRef}
             value={title}
+            rows={1}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={() => void commitTitle()}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }}
             aria-label="Note title"
             placeholder="Untitled note"
             disabled={note.isLocked}
-            className="m-0 w-full border-0 bg-transparent p-0 font-extrabold text-text-1 outline-none placeholder:text-text-4"
+            className="m-0 w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-extrabold text-text-1 outline-none placeholder:text-text-4"
             style={{ fontSize: 34, letterSpacing: '-0.03em', lineHeight: 1.12, marginBottom: 12 }}
           />
 

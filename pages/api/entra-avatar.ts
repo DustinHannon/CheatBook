@@ -2,15 +2,16 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { serialize } from 'cookie';
 
-// Mirror the signed-in user's Microsoft 365 (Entra) profile photo into their
-// CheatBook avatar. The client posts the Azure provider_token (only available on
-// the fresh OAuth session) right after an Entra sign-in; we call Microsoft Graph
-// server-side (no browser CORS), upload the photo to the public `avatars` bucket
-// under the user's own folder, and point profiles.avatar at it.
-//
-// Respect manual choices: we only (re)sync when the current avatar is empty or is
-// itself Entra-sourced (stored at `<uid>/entra.*`). A user who uploads their own
-// photo in Settings (stored at `<uid>/avatar.*`) is never overwritten.
+// Sync the signed-in user's Microsoft 365 (Entra) directory profile into their
+// CheatBook profile. The client posts the Azure provider_token (only present on
+// the fresh OAuth session) right after an Entra sign-in. We call Microsoft Graph
+// server-side (no browser CORS):
+//   - GET /me            -> name (displayName), title (jobTitle), team_name (department)
+//   - GET /me/photo/$value -> avatar (uploaded to the public avatars bucket)
+// Profile-field sync and photo sync are independent and BEST-EFFORT: a failure in
+// one never fails the other, and the route never 500s (errors are logged for ops).
+// The photo only (re)syncs when the avatar is empty or itself Entra-sourced
+// (`<uid>/entra.*`), so a manually uploaded avatar (`<uid>/avatar.*`) is preserved.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -22,8 +23,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'Missing provider token' });
   }
 
-  // Server client bound to the request cookies — uploads/updates run as the user,
-  // so storage + profiles RLS (owner-scoped) is satisfied.
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -44,52 +43,66 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // Don't clobber a manually uploaded avatar.
-  const { data: profile } = await supabase.from('profiles').select('avatar').eq('id', user.id).maybeSingle();
-  const current: string = profile?.avatar ?? '';
-  const entraManaged = current === '' || current.includes(`/${user.id}/entra.`) || current.includes('/entra.');
-  if (!entraManaged) {
-    return res.status(200).json({ applied: false, reason: 'manual avatar set' });
-  }
+  const graph = (path: string) =>
+    fetch(`https://graph.microsoft.com/v1.0${path}`, { headers: { Authorization: `Bearer ${providerToken}` } });
 
-  // Fetch the Microsoft 365 profile photo. 404 = the user has no photo set.
-  let photoRes: Response;
+  const applied: string[] = [];
+
+  // ── 1. Directory profile fields (name / title / department) ──────────────
   try {
-    photoRes = await fetch('https://graph.microsoft.com/v1.0/me/photo/$value', {
-      headers: { Authorization: `Bearer ${providerToken}` },
-    });
-  } catch {
-    return res.status(502).json({ error: 'Could not reach Microsoft Graph' });
-  }
-  if (photoRes.status === 404) {
-    return res.status(200).json({ applied: false, reason: 'no Microsoft photo' });
-  }
-  if (!photoRes.ok) {
-    return res.status(502).json({ error: `Graph photo fetch failed (${photoRes.status})` });
-  }
-
-  const contentType = photoRes.headers.get('content-type') || 'image/jpeg';
-  const ext = contentType.includes('png') ? 'png' : 'jpg';
-  const bytes = Buffer.from(await photoRes.arrayBuffer());
-  // Guard against an empty/oversized payload (avatars bucket caps at ~5MB).
-  if (bytes.byteLength === 0 || bytes.byteLength > 5 * 1024 * 1024) {
-    return res.status(200).json({ applied: false, reason: 'photo missing or too large' });
+    const meRes = await graph('/me?$select=displayName,jobTitle,department');
+    if (meRes.ok) {
+      const me = (await meRes.json()) as { displayName?: string; jobTitle?: string; department?: string };
+      const upd: Record<string, string> = {};
+      if (me.displayName) upd.name = me.displayName;
+      if (me.jobTitle) upd.title = me.jobTitle;
+      if (me.department) upd.team_name = me.department;
+      if (Object.keys(upd).length) {
+        const { error } = await supabase.from('profiles').update(upd).eq('id', user.id);
+        if (error) console.error('[entra-sync] profile fields update failed:', error.message);
+        else applied.push(...Object.keys(upd));
+      }
+    } else {
+      console.error('[entra-sync] Graph /me failed:', meRes.status, await meRes.text());
+    }
+  } catch (e) {
+    console.error('[entra-sync] Graph /me threw:', e);
   }
 
-  const path = `${user.id}/entra.${ext}`;
-  const { data: up, error: upErr } = await supabase.storage
-    .from('avatars')
-    .upload(path, bytes, { upsert: true, contentType });
-  if (upErr || !up) {
-    return res.status(500).json({ error: 'Could not store avatar' });
+  // ── 2. Profile photo (best-effort; preserves a manual upload) ────────────
+  try {
+    const { data: profile } = await supabase.from('profiles').select('avatar').eq('id', user.id).maybeSingle();
+    const current: string = profile?.avatar ?? '';
+    const entraManaged = current === '' || current.includes('/entra.');
+    if (entraManaged) {
+      const photoRes = await graph('/me/photo/$value');
+      if (photoRes.ok) {
+        const contentType = photoRes.headers.get('content-type') || 'image/jpeg';
+        const ext = contentType.includes('png') ? 'png' : 'jpg';
+        const buf = await photoRes.arrayBuffer();
+        if (buf.byteLength > 0 && buf.byteLength <= 5 * 1024 * 1024) {
+          const blob = new Blob([buf], { type: contentType });
+          const path = `${user.id}/entra.${ext}`;
+          const { data: up, error: upErr } = await supabase.storage
+            .from('avatars')
+            .upload(path, blob, { upsert: true, contentType });
+          if (upErr) {
+            console.error('[entra-sync] avatar upload failed:', upErr.message);
+          } else if (up) {
+            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(up.path);
+            const avatarUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+            const { error: avErr } = await supabase.from('profiles').update({ avatar: avatarUrl }).eq('id', user.id);
+            if (avErr) console.error('[entra-sync] avatar profile update failed:', avErr.message);
+            else applied.push('avatar');
+          }
+        }
+      } else if (photoRes.status !== 404) {
+        console.error('[entra-sync] Graph photo failed:', photoRes.status, await photoRes.text());
+      }
+    }
+  } catch (e) {
+    console.error('[entra-sync] photo threw:', e);
   }
 
-  const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(up.path);
-  const avatarUrl = `${urlData.publicUrl}?v=${Date.now()}`; // cache-bust so it refreshes everywhere
-  const { error: profErr } = await supabase.from('profiles').update({ avatar: avatarUrl }).eq('id', user.id);
-  if (profErr) {
-    return res.status(500).json({ error: 'Could not update profile' });
-  }
-
-  return res.status(200).json({ applied: true, avatarUrl });
+  return res.status(200).json({ applied });
 }
