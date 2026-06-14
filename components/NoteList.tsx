@@ -23,18 +23,15 @@ const CHIP_DEFS: { id: FilterChip; label: string }[] = [
 ];
 
 function titleFor(scope: Scope): string {
-  if (scope === 'shared') return 'Shared with me';
   if (scope === 'starred') return 'Starred';
   return 'All Notes';
 }
 function subtitleFor(scope: Scope): string {
-  if (scope === 'shared') return 'Notes teammates have shared with you';
   if (scope === 'starred') return 'Notes you’ve bookmarked for quick recall';
   return '';
 }
 function emptyFor(scope: Scope): string {
   if (scope === 'starred') return 'No starred notes yet — tap the star on any note to pin it here.';
-  if (scope === 'shared') return 'Nothing shared with you yet.';
   return 'No notes match this filter.';
 }
 

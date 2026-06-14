@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
-  Space, Member, Note, Attachment, ShareGrant, LinkShare, ActivityEvent,
-  Permission, NotificationPrefs, Appearance, UserAccount,
+  Space, Member, Note, Attachment, ActivityEvent,
+  NotificationPrefs, Appearance, UserAccount,
 } from './types';
 import { initials, colorForId } from './colors';
 import { snippetFromDoc, docToText, docHasImage, emptyDoc, legacyToDoc } from './blocks';
@@ -17,13 +17,6 @@ export async function getCurrentUser(supabase: DB) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
   return user;
-}
-
-export async function getUserTeamId(supabase: DB): Promise<string | null> {
-  const user = await getCurrentUser(supabase);
-  const { data, error } = await supabase.from('profiles').select('team_id').eq('id', user.id).single();
-  if (error) throw error;
-  return data?.team_id ?? null;
 }
 
 // ─── Members ──────────────────────────────────────────────────────────
@@ -46,42 +39,35 @@ function mapMember(p: any, role = 'member'): Member {
   };
 }
 
-export async function getMembers(supabase: DB, teamId: string): Promise<Member[]> {
+// All approved profiles — drives presence/avatars. RLS lets any approved user
+// read all approved profiles; no team scoping anymore.
+export async function getMembers(supabase: DB): Promise<Member[]> {
   const { data, error } = await supabase
-    .from('team_members')
-    .select('role, user_id, profiles:user_id(*)')
-    .eq('team_id', teamId)
+    .from('profiles')
+    .select('*')
+    .eq('approved', true)
     .order('created_at', { ascending: true });
   if (error) throw error;
-  return (data || [])
-    .filter((m: any) => m.profiles)
-    .map((m: any) => mapMember(m.profiles, m.role));
+  return (data || []).map((p: any) => mapMember(p, p.is_admin ? 'admin' : 'member'));
 }
 
 export async function getCurrentMember(supabase: DB): Promise<Member> {
   const user = await getCurrentUser(supabase);
   const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
   if (error) throw error;
-  let role = 'member';
-  if (data?.team_id) {
-    const { data: tm } = await supabase
-      .from('team_members').select('role').eq('team_id', data.team_id).eq('user_id', user.id).maybeSingle();
-    role = tm?.role || 'member';
-  }
-  return mapMember(data, role);
+  return mapMember(data, data?.is_admin ? 'admin' : 'member');
 }
 
 // ─── Users (admin) ────────────────────────────────────────────────────
-// Admin-only roster: admins read ALL profiles (incl. pending) via RLS; everyone
-// else reads same-team only. Role/team come from the joined team_members row.
+// Admin-only roster: admins read ALL profiles (incl. not-yet-approved) via RLS;
+// access is the binary approved/is_admin pair on the profile itself.
 export async function getAllUsers(supabase: DB): Promise<UserAccount[]> {
   try {
-    const { data, error } = await supabase.from('profiles').select('*, team_members(role)');
+    const { data, error } = await supabase.from('profiles').select('*');
     if (error) throw error;
     return (data || [])
       .map((p: any): UserAccount => {
         const email = p.email || '';
-        const role = (p.team_members?.[0]?.role ?? null) as 'admin' | 'member' | null;
         return {
           id: p.id,
           name: p.name || (email ? email.split('@')[0] : 'Unknown'),
@@ -90,38 +76,37 @@ export async function getAllUsers(supabase: DB): Promise<UserAccount[]> {
           initials: initials(p.name || email),
           color: p.color || colorForId(p.id),
           avatarUrl: p.avatar ?? null,
-          role,
-          teamId: p.team_id ?? null,
-          pending: p.team_id == null,
+          isAdmin: !!p.is_admin,
+          approved: !!p.approved,
           createdAt: p.created_at ?? null,
         };
       })
-      // Pending users first, then alphabetical by name.
-      .sort((a, b) => (Number(b.pending) - Number(a.pending)) || a.name.localeCompare(b.name));
+      // Not-approved users first (awaiting an admin decision), then alphabetical.
+      .sort((a, b) => (Number(a.approved) - Number(b.approved)) || a.name.localeCompare(b.name));
   } catch { return []; }
 }
 
-export async function addUserToTeam(supabase: DB, userId: string, role: 'admin' | 'member' = 'member'): Promise<void> {
-  const { error } = await supabase.rpc('admin_add_user_to_team', { p_user_id: userId, p_role: role });
+export async function approveUser(supabase: DB, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_approve_user', { p_user_id: userId });
   if (error) throw error;
 }
 
-export async function removeUserFromTeam(supabase: DB, userId: string): Promise<void> {
-  const { error } = await supabase.rpc('admin_remove_user_from_team', { p_user_id: userId });
+export async function revokeUser(supabase: DB, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_revoke_user', { p_user_id: userId });
   if (error) throw error;
 }
 
-export async function setUserRole(supabase: DB, userId: string, role: 'admin' | 'member'): Promise<void> {
-  const { error } = await supabase.rpc('admin_set_user_role', { p_user_id: userId, p_role: role });
+export async function setAdmin(supabase: DB, userId: string, isAdmin: boolean): Promise<void> {
+  const { error } = await supabase.rpc('admin_set_admin', { p_user_id: userId, p_is_admin: isAdmin });
   if (error) throw error;
 }
 
 // ─── Spaces (notebooks) ───────────────────────────────────────────────
-export async function getSpaces(supabase: DB, teamId: string): Promise<Space[]> {
+export async function getSpaces(supabase: DB): Promise<Space[]> {
+  // RLS restricts rows to approved users; no team scoping anymore.
   const { data, error } = await supabase
     .from('notebooks')
     .select('*, notes(count)')
-    .eq('team_id', teamId)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) throw error;
@@ -137,15 +122,14 @@ export async function getSpaces(supabase: DB, teamId: string): Promise<Space[]> 
 
 export async function createSpace(supabase: DB, name: string, color = '#6ea8fe'): Promise<Space> {
   const user = await getCurrentUser(supabase);
-  const teamId = await getUserTeamId(supabase);
   // New spaces sort after the current max so they land at the bottom of the list.
   const { data: last } = await supabase
-    .from('notebooks').select('sort_order').eq('team_id', teamId)
+    .from('notebooks').select('sort_order')
     .order('sort_order', { ascending: false }).limit(1).maybeSingle();
   const sortOrder = (last?.sort_order ?? 0) + 1;
   const { data, error } = await supabase
     .from('notebooks')
-    .insert({ title: name, owner_id: user.id, team_id: teamId, color, sort_order: sortOrder })
+    .insert({ title: name, owner_id: user.id, color, sort_order: sortOrder })
     .select().single();
   if (error) throw error;
   return { id: data.id, name: data.title, color: data.color, icon: data.icon, sortOrder: data.sort_order, noteCount: 0 };
@@ -181,7 +165,7 @@ export async function deleteSpace(supabase: DB, spaceId: string): Promise<void> 
 
 // ─── Notes ────────────────────────────────────────────────────────────
 const NOTE_SELECT =
-  '*, notebooks!inner(id,title,color,team_id), owner:owner_id(name), editor:last_edited_by(name), note_attachments(count), note_collaborators(user_id,permission)';
+  '*, notebooks(id,title,color), owner:owner_id(name), editor:last_edited_by(name), note_attachments(count)';
 
 // Coerce a stored note body into a valid TipTap doc. Guards against the column
 // default ('[]' array), legacy HTML strings, and malformed jsonb so the editor
@@ -196,9 +180,8 @@ function mapNote(row: any, starredIds: Set<string>): Note {
   const space = row.notebooks
     ? { id: row.notebooks.id, name: row.notebooks.title, color: row.notebooks.color || '#6ea8fe' }
     : null;
-  const collaboratorIds: string[] = (row.note_collaborators || []).map((c: any) => c.user_id);
-  // Owner is always an implicit collaborator for "contributors" display.
-  if (row.owner_id && !collaboratorIds.includes(row.owner_id)) collaboratorIds.unshift(row.owner_id);
+  // Sharing is removed; the only implicit contributor is the note's owner.
+  const collaboratorIds: string[] = row.owner_id ? [row.owner_id] : [];
   return {
     id: row.id,
     spaceId: row.notebook_id,
@@ -232,9 +215,10 @@ async function getStarredSet(supabase: DB): Promise<Set<string>> {
   } catch { return new Set(); }
 }
 
-export async function getNotes(supabase: DB, teamId: string): Promise<Note[]> {
+export async function getNotes(supabase: DB): Promise<Note[]> {
+  // RLS restricts rows to approved users; any approved user sees all notes.
   const [{ data, error }, starred] = await Promise.all([
-    supabase.from('notes').select(NOTE_SELECT).eq('notebooks.team_id', teamId).order('updated_at', { ascending: false }),
+    supabase.from('notes').select(NOTE_SELECT).order('updated_at', { ascending: false }),
     getStarredSet(supabase),
   ]);
   if (error) throw error;
@@ -350,14 +334,14 @@ export async function setStar(supabase: DB, noteId: string, starred: boolean): P
 }
 
 // ─── Search ───────────────────────────────────────────────────────────
-export async function searchNotes(supabase: DB, teamId: string, query: string): Promise<Note[]> {
+export async function searchNotes(supabase: DB, query: string): Promise<Note[]> {
   const q = query.trim();
   if (!q) return [];
   // Escape backslash/quote then wrap in quotes so PostgREST treats punctuation
   // literally instead of as .or() filter syntax (prevents filter injection).
   const term = q.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   const [{ data, error }, starred] = await Promise.all([
-    supabase.from('notes').select(NOTE_SELECT).eq('notebooks.team_id', teamId)
+    supabase.from('notes').select(NOTE_SELECT)
       .or(`title.ilike."%${term}%",content.ilike."%${term}%"`)
       .order('updated_at', { ascending: false }).limit(50),
     getStarredSet(supabase),
@@ -366,52 +350,25 @@ export async function searchNotes(supabase: DB, teamId: string, query: string): 
   return (data || []).map((n: any) => mapNote(n, starred));
 }
 
-// ─── Collaborators / share grants ─────────────────────────────────────
-export async function getCollaborators(supabase: DB, noteId: string): Promise<ShareGrant[]> {
-  const { data, error } = await supabase.from('note_collaborators')
-    .select('note_id,user_id,permission').eq('note_id', noteId);
-  if (error) throw error;
-  return (data || []).map((r: any) => ({ noteId: r.note_id, userId: r.user_id, permission: r.permission as Permission }));
+// ─── Private file serving ─────────────────────────────────────────────
+// The 'images' bucket is private; objects are never served by public URL.
+// Both inline images and attachments store/return this proxy path, which the
+// auth-checked `/api/file` route resolves to a short-lived signed URL.
+export function fileUrl(path: string): string {
+  return '/api/file?path=' + encodeURIComponent(path);
 }
 
-export async function addCollaboratorByEmail(supabase: DB, noteId: string, email: string, permission: Permission = 'view'): Promise<void> {
-  const { data: profile, error: pe } = await supabase.from('profiles').select('id').ilike('email', email).maybeSingle();
-  if (pe) throw pe;
-  if (!profile) throw new Error('No teammate found with that email.');
-  const { error } = await supabase.from('note_collaborators')
-    .upsert({ note_id: noteId, user_id: profile.id, permission });
-  if (error) throw error;
-}
-
-export async function setCollaboratorPermission(supabase: DB, noteId: string, userId: string, permission: Permission): Promise<void> {
-  const { error } = await supabase.from('note_collaborators')
-    .upsert({ note_id: noteId, user_id: userId, permission });
-  if (error) throw error;
-}
-
-export async function removeCollaborator(supabase: DB, noteId: string, userId: string): Promise<void> {
-  const { error } = await supabase.from('note_collaborators').delete().eq('note_id', noteId).eq('user_id', userId);
-  if (error) throw error;
-}
-
-// ─── Link sharing ─────────────────────────────────────────────────────
-export async function getLinkShare(supabase: DB, noteId: string): Promise<LinkShare> {
-  const { data, error } = await supabase.from('note_link_shares').select('*').eq('note_id', noteId).maybeSingle();
-  if (error) throw error;
-  return {
-    noteId,
-    enabled: data?.enabled ?? false,
-    scope: (data?.scope as 'tenant' | 'anyone') ?? 'tenant',
-    permission: (data?.permission as 'view' | 'edit') ?? 'view',
-  };
-}
-
-export async function setLinkShare(supabase: DB, share: LinkShare): Promise<void> {
-  const { error } = await supabase.from('note_link_shares').upsert({
-    note_id: share.noteId, enabled: share.enabled, scope: share.scope,
-    permission: share.permission, updated_at: new Date().toISOString(),
-  });
-  if (error) throw error;
+// Recover the raw storage object path from a proxy url produced by fileUrl().
+function storagePathFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  // New form: /api/file?path=<encoded storage path>.
+  const marker = '?path=';
+  const i = url.indexOf(marker);
+  if (i !== -1) return decodeURIComponent(url.slice(i + marker.length));
+  // Legacy public-URL form, kept so old rows can still be cleaned up.
+  const legacy = '/object/public/images/';
+  if (url.includes(legacy)) return decodeURIComponent(url.slice(url.indexOf(legacy) + legacy.length));
+  return null;
 }
 
 // ─── Attachments ──────────────────────────────────────────────────────
@@ -434,10 +391,10 @@ export async function uploadAttachment(supabase: DB, noteId: string, file: File)
   const path = `${user.id}/${noteId}/${Date.now()}.${ext}`;
   const { data: up, error: ue } = await supabase.storage.from('images').upload(path, file);
   if (ue) throw ue;
-  const { data: urlData } = supabase.storage.from('images').getPublicUrl(up.path);
+  // Private bucket: store the auth-checked proxy path, never a public URL.
   const { data, error } = await supabase.from('note_attachments').insert({
     note_id: noteId, file_name: file.name, mime: file.type, size_bytes: file.size,
-    url: urlData.publicUrl, kind: ext.toUpperCase(), uploaded_by: user.id,
+    url: fileUrl(up.path), kind: ext.toUpperCase(), uploaded_by: user.id,
   }).select().single();
   if (error) throw error;
   return { id: data.id, noteId, fileName: data.file_name, mime: data.mime, sizeBytes: data.size_bytes,
@@ -445,15 +402,12 @@ export async function uploadAttachment(supabase: DB, noteId: string, file: File)
 }
 
 export async function deleteAttachment(supabase: DB, id: string): Promise<void> {
-  // Remove the underlying storage object too, else the (public) file is orphaned
-  // and remains downloadable by URL after the user deletes the attachment.
+  // Remove the underlying storage object too, else the file is orphaned in the
+  // bucket after the user deletes the attachment. The storage path is recovered
+  // from the proxy url (?path=) — or the legacy public-URL form for old rows.
   const { data: row } = await supabase.from('note_attachments').select('url').eq('id', id).maybeSingle();
-  const url: string | undefined = row?.url;
-  const marker = '/object/public/images/';
-  if (url && url.includes(marker)) {
-    const path = decodeURIComponent(url.slice(url.indexOf(marker) + marker.length));
-    if (path) await supabase.storage.from('images').remove([path]);
-  }
+  const path = storagePathFromUrl(row?.url);
+  if (path) await supabase.storage.from('images').remove([path]);
   const { error } = await supabase.from('note_attachments').delete().eq('id', id);
   if (error) throw error;
 }
@@ -468,18 +422,19 @@ function assertImage(file: File, maxBytes: number) {
   if (file.size > maxBytes) throw new Error(`Image too large (max ${maxBytes / 1024 / 1024} MB).`);
 }
 
-export async function uploadNoteImage(supabase: DB, noteId: string, file: File): Promise<{ url: string; fileName: string; sizeBytes: number }> {
+export async function uploadNoteImage(supabase: DB, noteId: string, file: File): Promise<{ url: string; path: string; fileName: string; sizeBytes: number }> {
   assertImage(file, MAX_IMAGE_BYTES);
   const user = await getCurrentUser(supabase);
   const ext = file.name.split('.').pop() || 'png';
   const path = `${user.id}/${noteId}/${Date.now()}.${ext}`;
   const { data: up, error: ue } = await supabase.storage.from('images').upload(path, file);
   if (ue) throw ue;
-  const { data: urlData } = supabase.storage.from('images').getPublicUrl(up.path);
+  // Private bucket: persist the raw storage path; serve via the auth-checked
+  // /api/file proxy so PHI in screenshots isn't reachable by guessable URL.
   await supabase.from('images').insert({
-    note_id: noteId, file_path: urlData.publicUrl, file_name: file.name, mime_type: file.type, size: file.size,
+    note_id: noteId, file_path: up.path, file_name: file.name, mime_type: file.type, size: file.size,
   });
-  return { url: urlData.publicUrl, fileName: file.name, sizeBytes: file.size };
+  return { url: fileUrl(up.path), path: up.path, fileName: file.name, sizeBytes: file.size };
 }
 
 export async function uploadAvatar(supabase: DB, file: File): Promise<string> {
@@ -519,21 +474,21 @@ export async function updateAppearance(supabase: DB, appearance: Appearance): Pr
 
 // ─── Activity ─────────────────────────────────────────────────────────
 export async function logActivity(
-  supabase: DB, teamId: string, verb: string, targetType: string,
+  supabase: DB, verb: string, targetType: string,
   targetId: string | null, targetTitle: string | null,
 ): Promise<void> {
   try {
     const user = await getCurrentUser(supabase);
     await supabase.from('activity_log').insert({
-      team_id: teamId, user_id: user.id, action: verb, target_type: targetType,
+      user_id: user.id, action: verb, target_type: targetType,
       target_id: targetId, target_title: targetTitle,
     });
   } catch { /* activity is best-effort, never block the UX */ }
 }
 
-export async function getActivity(supabase: DB, teamId: string, limit = 20): Promise<ActivityEvent[]> {
+export async function getActivity(supabase: DB, limit = 20): Promise<ActivityEvent[]> {
   const { data, error } = await supabase.from('activity_log')
-    .select('*, profiles:user_id(name,color)').eq('team_id', teamId)
+    .select('*, profiles:user_id(name,color)')
     .order('created_at', { ascending: false }).limit(limit);
   if (error) throw error;
   return (data || []).map((e: any): ActivityEvent => ({

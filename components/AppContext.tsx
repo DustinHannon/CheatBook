@@ -4,18 +4,21 @@ import { useAuth } from './AuthContext';
 import { usePresence } from './PresenceContext';
 import {
   getCurrentMember, getMembers, getSpaces, getNotes, getActivity,
-  getUserTeamId, setStar as apiSetStar, setPinned as apiSetPinned,
+  setStar as apiSetStar, setPinned as apiSetPinned,
   createNote as apiCreateNote, createSpace as apiCreateSpace,
   deleteNote as apiDeleteNote, moveNoteToSpace as apiMoveNote,
   updateSpace as apiUpdateSpace, deleteSpace as apiDeleteSpace, logActivity,
 } from '../lib/api';
 import type { Member, Space, Note, ActivityEvent } from '../lib/types';
 
+// Single platform now — the live channel is keyed on a constant, not a team.
+const PLATFORM_CHANNEL = 'cb-platform';
+
 type AppContextType = {
   loading: boolean;
-  teamId: string | null;
-  isPending: boolean;         // authed but not yet on a team (awaiting admin add)
-  isAdmin: boolean;           // current member's role is 'admin'
+  approved: boolean;          // platform access granted by an admin
+  isPending: boolean;         // authed, loaded, but not yet approved
+  isAdmin: boolean;           // current member is a platform admin
   me: Member | null;
   members: Member[];          // with live `online` flag merged in
   spaces: Space[];
@@ -57,7 +60,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const { onlineIds } = usePresence();
 
   const [loading, setLoading] = useState(true);
-  const [teamId, setTeamId] = useState<string | null>(null);
+  const [approved, setApproved] = useState(false);
   const [me, setMe] = useState<Member | null>(null);
   const [rawMembers, setRawMembers] = useState<Member[]>([]);
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -68,7 +71,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [accountOpen, setAccountOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
 
-  const teamIdRef = useRef<string | null>(null);
+  const approvedRef = useRef(false);
   // Mirrors of list state so data ops can read current values without taking
   // notes/spaces as deps (which would re-create the live-channel effect).
   const notesRef = useRef<Note[]>([]);
@@ -77,32 +80,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => { spacesRef.current = spaces; }, [spaces]);
 
   const refreshNotes = useCallback(async () => {
-    if (!teamIdRef.current) return;
-    try { setNotes(await getNotes(supabase, teamIdRef.current)); } catch { /* keep prior */ }
+    if (!approvedRef.current) return;
+    try { setNotes(await getNotes(supabase)); } catch { /* keep prior */ }
   }, []);
   const refreshSpaces = useCallback(async () => {
-    if (!teamIdRef.current) return;
-    try { setSpaces(await getSpaces(supabase, teamIdRef.current)); } catch { /* keep prior */ }
+    if (!approvedRef.current) return;
+    try { setSpaces(await getSpaces(supabase)); } catch { /* keep prior */ }
   }, []);
   const refreshActivity = useCallback(async () => {
-    if (!teamIdRef.current) return;
-    try { setActivity(await getActivity(supabase, teamIdRef.current)); } catch { /* keep prior */ }
+    if (!approvedRef.current) return;
+    try { setActivity(await getActivity(supabase)); } catch { /* keep prior */ }
   }, []);
   const refreshMe = useCallback(async () => {
     try { setMe(await getCurrentMember(supabase)); } catch { /* keep prior */ }
   }, []);
   const refreshMembers = useCallback(async () => {
-    if (!teamIdRef.current) return;
-    try { setRawMembers(await getMembers(supabase, teamIdRef.current)); } catch { /* keep prior */ }
+    if (!approvedRef.current) return;
+    try { setRawMembers(await getMembers(supabase)); } catch { /* keep prior */ }
   }, []);
 
   // Initial load on auth.
   useEffect(() => {
     if (!isAuthenticated || !user) {
       // Clear all derived state on logout/user-switch so the prior session's data
-      // can't linger and the live team channel (keyed on teamId) tears down.
-      teamIdRef.current = null;
-      setTeamId(null); setMe(null); setRawMembers([]); setSpaces([]); setNotes([]); setActivity([]);
+      // can't linger and the live platform channel tears down.
+      approvedRef.current = false;
+      setApproved(false); setMe(null); setRawMembers([]); setSpaces([]); setNotes([]); setActivity([]);
       setLoading(false);
       return;
     }
@@ -110,16 +113,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     (async () => {
       setLoading(true);
       try {
-        const tid = await getUserTeamId(supabase);
+        // Access is the binary `approved` flag on the profile.
+        const { data: profile } = await supabase
+          .from('profiles').select('approved').eq('id', user.id).single();
         if (cancelled) return;
-        teamIdRef.current = tid;
-        setTeamId(tid);
+        const isApproved = !!profile?.approved;
+        approvedRef.current = isApproved;
+        setApproved(isApproved);
         const [meRes, membersRes, spacesRes, notesRes, activityRes] = await Promise.allSettled([
           getCurrentMember(supabase),
-          tid ? getMembers(supabase, tid) : Promise.resolve([]),
-          tid ? getSpaces(supabase, tid) : Promise.resolve([]),
-          tid ? getNotes(supabase, tid) : Promise.resolve([]),
-          tid ? getActivity(supabase, tid) : Promise.resolve([]),
+          isApproved ? getMembers(supabase) : Promise.resolve([]),
+          isApproved ? getSpaces(supabase) : Promise.resolve([]),
+          isApproved ? getNotes(supabase) : Promise.resolve([]),
+          isApproved ? getActivity(supabase) : Promise.resolve([]),
         ]);
         if (cancelled) return;
         if (meRes.status === 'fulfilled') setMe(meRes.value);
@@ -134,11 +140,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => { cancelled = true; };
   }, [isAuthenticated, user]);
 
-  // Live team updates: refetch on relevant DB changes (debounced). A note change
-  // affects BOTH the notes list and per-space note counts, so it refreshes spaces
-  // too. Profile changes refresh members + me so names/avatars/titles stay live.
+  // Live platform updates: refetch on relevant DB changes (debounced). A note
+  // change affects BOTH the notes list and per-space note counts, so it refreshes
+  // spaces too. Profile changes refresh members + me so names/avatars/titles stay
+  // live. One channel for the whole platform now (no team scoping); gated on
+  // approval so unapproved users don't subscribe.
   useEffect(() => {
-    if (!teamId) return;
+    if (!approved) return;
     let t: ReturnType<typeof setTimeout> | null = null;
     let tp: ReturnType<typeof setTimeout> | null = null;
     const bumpNotes = () => {
@@ -150,14 +158,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       tp = setTimeout(() => { refreshMembers(); refreshMe(); }, 400);
     };
     const channel = supabase
-      .channel(`cb-team:${teamId}`)
+      .channel(PLATFORM_CHANNEL)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, bumpNotes)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, () => { if (t) clearTimeout(t); t = setTimeout(() => refreshActivity(), 400); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notebooks' }, () => { refreshSpaces(); })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, bumpProfiles)
       .subscribe();
     return () => { if (t) clearTimeout(t); if (tp) clearTimeout(tp); supabase.removeChannel(channel); };
-  }, [teamId, refreshNotes, refreshActivity, refreshSpaces, refreshMembers, refreshMe]);
+  }, [approved, refreshNotes, refreshActivity, refreshSpaces, refreshMembers, refreshMe]);
 
   // Merge live presence into members + me.
   const members = useMemo(
@@ -196,7 +204,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const note = await apiCreateNote(supabase, spaceId, title);
       setNotes((prev) => [note, ...prev]);
       bumpSpaceCount(spaceId, +1);
-      if (teamIdRef.current) logActivity(supabase, teamIdRef.current, 'created', 'note', note.id, note.title);
+      logActivity(supabase, 'created', 'note', note.id, note.title);
       return note;
     } catch { return null; }
   }, [bumpSpaceCount]);
@@ -208,7 +216,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     bumpSpaceCount(target?.spaceId, -1);
     try {
       await apiDeleteNote(supabase, noteId);
-      if (teamIdRef.current) logActivity(supabase, teamIdRef.current, 'deleted', 'note', noteId, target?.title ?? null);
+      logActivity(supabase, 'deleted', 'note', noteId, target?.title ?? null);
       return true;
     } catch {
       // Revert by refetching the authoritative lists.
@@ -281,15 +289,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const starredCount = useMemo(() => notes.filter((n) => n.starredByMe).length, [notes]);
 
-  // Pending: authenticated but the initial load finished with no team. Admin:
-  // current member carries the 'admin' role. Both gate the Users management UI
-  // and the pending-onboarding state.
-  const isPending = !loading && isAuthenticated && !teamId;
+  // Pending: authenticated and loaded but not yet approved (awaiting an admin).
+  // Admin: current member is a platform admin (role sourced from is_admin). Both
+  // gate the Users management UI and the pending-onboarding state.
+  const isPending = !loading && isAuthenticated && !approved;
   const isAdmin = me?.role === 'admin';
 
   return (
     <AppContext.Provider value={{
-      loading, teamId, isPending, isAdmin, me, members, spaces, notes, activity,
+      loading, approved, isPending, isAdmin, me, members, spaces, notes, activity,
       paletteOpen, accountOpen, navOpen,
       openPalette: () => setPaletteOpen(true),
       closePalette: () => setPaletteOpen(false),

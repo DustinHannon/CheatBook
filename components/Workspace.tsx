@@ -25,22 +25,20 @@ function firstParam(v: string | string[] | undefined): string | undefined {
 
 /**
  * Three-pane workspace orchestrator. Derives the scoped + chip-filtered +
- * space-filtered note list per the renderVals logic in
- * designideas/design-references/CheatBook.dc.html (lines 717–729): scope base
- * (all|shared|starred), chips apply only within `all`, ?space= composes and
- * clears the chip, pinned floated to top for `all`. Reads/writes ?filter= and
- * ?space= via shallow routing. Responsive grid: desktop 362px/1fr, tablet
- * 300px/1fr, mobile single-pane by selection.
+ * space-filtered note list: scope base (all|starred), chips apply only within
+ * `all`, ?space= composes and clears the chip, pinned floated to top for `all`.
+ * Reads/writes ?filter= and ?space= via shallow routing. Responsive grid:
+ * desktop 362px/1fr, tablet 300px/1fr, mobile single-pane by selection.
  */
 export const Workspace: React.FC<WorkspaceProps> = ({ scope, selectedNoteId }) => {
   const router = useRouter();
-  const { loading, notes, me, createNote, spaces } = useApp();
+  const { loading, notes, createNote, spaces } = useApp();
   const { showToast } = useToast();
 
   const activeChip = scope === 'all' ? parseChip(router.query.filter) : 'all';
   const spaceFilter = firstParam(router.query.space);
   // Persist the sort choice so it survives the remount when switching scope
-  // (all/shared/starred are separate routes — local state would reset otherwise).
+  // (all/starred are separate routes — local state would reset otherwise).
   const [sortKey, setSortKey] = useState<'updated' | 'title'>('updated');
   useEffect(() => {
     try {
@@ -58,12 +56,9 @@ export const Workspace: React.FC<WorkspaceProps> = ({ scope, selectedNoteId }) =
 
   // ── Derived list (mirrors reference renderVals) ─────────────────────
   const visibleNotes = useMemo<Note[]>(() => {
-    const meId = me?.id;
     // scope base
     let base = notes;
-    if (scope === 'shared') {
-      base = notes.filter((n) => !!meId && n.ownerId !== meId && n.collaboratorIds.includes(meId));
-    } else if (scope === 'starred') {
+    if (scope === 'starred') {
       base = notes.filter((n) => n.starredByMe);
     }
 
@@ -83,10 +78,10 @@ export const Workspace: React.FC<WorkspaceProps> = ({ scope, selectedNoteId }) =
       if (sortKey === 'title') return (a.title || '').localeCompare(b.title || '');
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
-  }, [notes, scope, me, spaceFilter, activeChip, sortKey]);
+  }, [notes, scope, spaceFilter, activeChip, sortKey]);
 
-  // /shared and /starred have no [id] route, so selection rides a ?note= query
-  // param there; /notes uses the [id] segment (selectedNoteId prop).
+  // /starred has no [id] route, so selection rides a ?note= query param there;
+  // /notes uses the [id] segment (selectedNoteId prop).
   const effectiveSelectedId = selectedNoteId ?? firstParam(router.query.note);
   const selectedNote = useMemo(
     () => (effectiveSelectedId ? notes.find((n) => n.id === effectiveSelectedId) : undefined),
@@ -108,10 +103,10 @@ export const Workspace: React.FC<WorkspaceProps> = ({ scope, selectedNoteId }) =
   const showEditorPane = !isMobile || showEditor;
 
   // ── Selection / navigation ──────────────────────────────────────────
-  const basePath = scope === 'shared' ? '/shared' : scope === 'starred' ? '/starred' : '/notes';
+  const basePath = scope === 'starred' ? '/starred' : '/notes';
 
   const onSelect = useCallback((id: string) => {
-    // Carry the active space/filter context, and keep shared/starred in-scope.
+    // Carry the active space/filter context, and keep starred in-scope.
     const carry: Record<string, string> = {};
     if (spaceFilter) carry.space = spaceFilter;
     if (activeChip !== 'all') carry.filter = activeChip;

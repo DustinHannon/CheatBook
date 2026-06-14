@@ -30,7 +30,6 @@ const ActionIcon: React.FC<{ d: string }> = ({ d }) => (
 
 // Reference path data for each quick action.
 const PATH_NEW = 'M12 5v14M5 12h14';
-const PATH_INVITE = 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M19 8v6M22 11h-6';
 const PATH_DASHBOARD = 'M3 11l9-7 9 7M5 10v9h14v-9';
 const PATH_UPLOAD = 'M12 3v12M7 8l5-5 5 5M5 21h14';
 const PATH_SPACE = 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z';
@@ -50,7 +49,7 @@ type Row =
 
 export const CommandPalette: React.FC = () => {
   const router = useRouter();
-  const { paletteOpen, closePalette, teamId, notes, spaces, createNote, createSpace } = useApp();
+  const { paletteOpen, closePalette, notes, spaces, createNote, createSpace } = useApp();
   const { showToast } = useToast();
 
   const [query, setQuery] = useState('');
@@ -84,12 +83,11 @@ export const CommandPalette: React.FC = () => {
     if (!paletteOpen) return;
     const q = query.trim();
     if (!q) { setResults(null); setSearching(false); return; }
-    if (!teamId) { setResults([]); setSearching(false); return; }
     setSearching(true);
     let cancelled = false;
     const handle = setTimeout(async () => {
       try {
-        const hits = await searchNotes(supabase, teamId, q);
+        const hits = await searchNotes(supabase, q);
         if (!cancelled) setResults(hits);
       } catch {
         if (!cancelled) setResults([]);
@@ -98,7 +96,7 @@ export const CommandPalette: React.FC = () => {
       }
     }, 200);
     return () => { cancelled = true; clearTimeout(handle); };
-  }, [query, teamId, paletteOpen]);
+  }, [query, paletteOpen]);
 
   const q = query.trim().toLowerCase();
 
@@ -139,12 +137,6 @@ export const CommandPalette: React.FC = () => {
     || (typeof router.query.note === 'string' ? router.query.note : undefined)
     || notes[0]?.id;
 
-  const runInvite = useCallback(() => {
-    closePalette();
-    if (!targetNoteId) { showToast('Create a note first, then invite a teammate.', 'info'); return; }
-    router.push(`/notes/${targetNoteId}?share=1`); // EditorPane opens the Share panel
-  }, [closePalette, targetNoteId, router, showToast]);
-
   const runDashboard = useCallback(() => {
     closePalette();
     router.push('/');
@@ -159,10 +151,9 @@ export const CommandPalette: React.FC = () => {
   const actionDefs = useMemo<ActionDef[]>(() => [
     { id: 'new', label: 'Create a new note', pathD: PATH_NEW, hotkey: 'N', run: runCreateNote },
     { id: 'space', label: 'Create a space', pathD: PATH_SPACE, run: runCreateSpace },
-    { id: 'invite', label: 'Invite a teammate', pathD: PATH_INVITE, run: runInvite },
     { id: 'dashboard', label: 'Go to Dashboard', pathD: PATH_DASHBOARD, run: runDashboard },
     { id: 'upload', label: 'Upload an image to this note', pathD: PATH_UPLOAD, run: runUpload },
-  ], [runCreateNote, runCreateSpace, runInvite, runDashboard, runUpload]);
+  ], [runCreateNote, runCreateSpace, runDashboard, runUpload]);
 
   // Quick actions filtered by label (mirrors reference logic).
   const actionHits = useMemo<ActionDef[]>(

@@ -173,6 +173,10 @@ const EditorInner: React.FC<InnerProps> = ({
   const insertImage = useCallback(async (file: File) => {
     if (!editor) return;
     try {
+      // uploadNoteImage returns `url` as the auth-checked /api/file?path=… proxy
+      // path (private images bucket — no public URL). It's a same-origin string
+      // the Image node renders as a normal <img src>; the proxy resolves it to a
+      // short-lived signed URL per request, so PHI isn't reachable by guessed URL.
       const { url } = await uploadNoteImage(supabase, note.id, file);
       editor.chain().focus().setImage({ src: url, alt: file.name }).run();
     } catch (err) {

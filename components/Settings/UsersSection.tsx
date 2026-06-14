@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '../../lib/supabase/client';
-import { getAllUsers, addUserToTeam, removeUserFromTeam, setUserRole } from '../../lib/api';
+import { getAllUsers, approveUser, revokeUser, setAdmin } from '../../lib/api';
 import { useToast } from '../Toast';
 import { useApp } from '../AppContext';
 import { Avatar } from '../ui/Avatar';
@@ -14,9 +14,11 @@ const supabase = createClient();
 type RoleValue = 'admin' | 'member';
 
 /**
- * Admin "Users" section: approve pending users into the team and manage member roles.
- * Mirrors the other Settings sections (SectionHead + Eyebrow groups, RowList-style cards,
- * Avatar rows, ConfirmDialog for destructive actions). All chrome uses theme tokens.
+ * Admin "Users" section: approve users onto the platform and manage admin rights.
+ * Access is binary — an approved user sees ALL notes/spaces; a not-approved user
+ * sees none. Mirrors the other Settings sections (SectionHead + Eyebrow groups,
+ * RowList-style cards, Avatar rows, ConfirmDialog for destructive actions). All
+ * chrome uses theme tokens.
  */
 export const UsersSection: React.FC = () => {
   const { showToast } = useToast();
@@ -26,8 +28,8 @@ export const UsersSection: React.FC = () => {
   const [error, setError] = useState(false);
   // Per-user in-flight guard so a row's buttons disable while its action runs.
   const [busyId, setBusyId] = useState<string | null>(null);
-  // The member queued for removal (drives the ConfirmDialog).
-  const [pendingRemoval, setPendingRemoval] = useState<UserAccount | null>(null);
+  // The user queued for access revocation (drives the ConfirmDialog).
+  const [pendingRevoke, setPendingRevoke] = useState<UserAccount | null>(null);
 
   const load = useCallback(async () => {
     setError(false);
@@ -42,33 +44,34 @@ export const UsersSection: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const { pending, team } = useMemo(() => {
+  const { notApproved, approvedUsers } = useMemo(() => {
     const list = users ?? [];
     return {
-      pending: list.filter((u) => u.pending),
-      team: list.filter((u) => !u.pending),
+      notApproved: list.filter((u) => !u.approved),
+      approvedUsers: list.filter((u) => u.approved),
     };
   }, [users]);
 
   const approve = useCallback(async (u: UserAccount) => {
     setBusyId(u.id);
     try {
-      await addUserToTeam(supabase, u.id, 'member');
-      showToast(`Added ${u.name || u.email}.`, 'success');
+      await approveUser(supabase, u.id);
+      showToast(`Approved ${u.name || u.email}.`, 'success');
       await load();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not add to team.', 'error');
+      showToast(err instanceof Error ? err.message : 'Could not approve user.', 'error');
     } finally {
       setBusyId(null);
     }
   }, [load, showToast]);
 
   const changeRole = useCallback(async (u: UserAccount, role: RoleValue) => {
-    if (u.role === role) return;
+    const nextAdmin = role === 'admin';
+    if (u.isAdmin === nextAdmin) return;
     setBusyId(u.id);
     try {
-      await setUserRole(supabase, u.id, role);
-      showToast(`${u.name || u.email} is now ${role === 'admin' ? 'an admin' : 'a member'}.`, 'success');
+      await setAdmin(supabase, u.id, nextAdmin);
+      showToast(`${u.name || u.email} is now ${nextAdmin ? 'an admin' : 'a member'}.`, 'success');
       await load();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not change role.', 'error');
@@ -77,27 +80,27 @@ export const UsersSection: React.FC = () => {
     }
   }, [load, showToast]);
 
-  const confirmRemove = useCallback(async () => {
-    const u = pendingRemoval;
-    setPendingRemoval(null);
+  const confirmRevoke = useCallback(async () => {
+    const u = pendingRevoke;
+    setPendingRevoke(null);
     if (!u) return;
     setBusyId(u.id);
     try {
-      await removeUserFromTeam(supabase, u.id);
-      showToast(`Removed ${u.name || u.email}.`, 'success');
+      await revokeUser(supabase, u.id);
+      showToast(`Revoked ${u.name || u.email}.`, 'success');
       await load();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not remove from team.', 'error');
+      showToast(err instanceof Error ? err.message : 'Could not revoke access.', 'error');
     } finally {
       setBusyId(null);
     }
-  }, [pendingRemoval, load, showToast]);
+  }, [pendingRevoke, load, showToast]);
 
   return (
     <>
       <SectionHead
         title="Users"
-        lead="Approve who can access CheatBook and manage roles."
+        lead="Approve who can access CheatBook and manage admin rights."
       />
 
       {users === null && !error && <UsersLoading />}
@@ -143,25 +146,25 @@ export const UsersSection: React.FC = () => {
 
       {users !== null && (
         <>
-          {/* ── Pending approval ─────────────────────────────────── */}
+          {/* ── Not approved ─────────────────────────────────────── */}
           <div style={{ marginBottom: 28 }}>
             <Eyebrow style={{ marginBottom: 11 }}>
-              PENDING APPROVAL{pending.length > 0 ? ` · ${pending.length}` : ''}
+              NOT APPROVED{notApproved.length > 0 ? ` · ${notApproved.length}` : ''}
             </Eyebrow>
-            {pending.length === 0 ? (
+            {notApproved.length === 0 ? (
               <div style={{ fontSize: 12.5, color: 'var(--text-3)', paddingLeft: 2 }}>
                 No one is waiting for access.
               </div>
             ) : (
               <div style={listStyle}>
-                {pending.map((u) => (
+                {notApproved.map((u) => (
                   <UserRow key={u.id}>
                     <UserIdentity user={u} />
                     <button
                       type="button"
                       onClick={() => approve(u)}
                       disabled={busyId === u.id}
-                      aria-label={`Add ${u.name || u.email} to the team`}
+                      aria-label={`Approve ${u.name || u.email}`}
                       className="cb-users-primary"
                       style={{
                         flex: '0 0 auto',
@@ -182,7 +185,7 @@ export const UsersSection: React.FC = () => {
                       }}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
-                      {busyId === u.id ? 'Adding…' : 'Add to team'}
+                      {busyId === u.id ? 'Approving…' : 'Approve'}
                     </button>
                   </UserRow>
                 ))}
@@ -190,21 +193,21 @@ export const UsersSection: React.FC = () => {
             )}
           </div>
 
-          {/* ── Team members ─────────────────────────────────────── */}
+          {/* ── Approved users ───────────────────────────────────── */}
           <div>
             <Eyebrow style={{ marginBottom: 11 }}>
-              TEAM MEMBERS{team.length > 0 ? ` · ${team.length}` : ''}
+              APPROVED USERS{approvedUsers.length > 0 ? ` · ${approvedUsers.length}` : ''}
             </Eyebrow>
-            {team.length === 0 ? (
+            {approvedUsers.length === 0 ? (
               <div style={{ fontSize: 12.5, color: 'var(--text-3)', paddingLeft: 2 }}>
-                No team members yet.
+                No approved users yet.
               </div>
             ) : (
               <div style={listStyle}>
-                {team.map((u) => {
+                {approvedUsers.map((u) => {
                   const isSelf = me?.id === u.id;
                   const busy = busyId === u.id;
-                  const role: RoleValue = u.role === 'admin' ? 'admin' : 'member';
+                  const role: RoleValue = u.isAdmin ? 'admin' : 'member';
                   return (
                     <UserRow key={u.id}>
                       <UserIdentity user={u} isSelf={isSelf} />
@@ -217,9 +220,9 @@ export const UsersSection: React.FC = () => {
                         />
                         <button
                           type="button"
-                          onClick={() => setPendingRemoval(u)}
+                          onClick={() => setPendingRevoke(u)}
                           disabled={busy || isSelf}
-                          aria-label={isSelf ? 'You cannot remove yourself' : `Remove ${u.name || u.email} from the team`}
+                          aria-label={isSelf ? 'You cannot revoke your own access' : `Revoke access for ${u.name || u.email}`}
                           className="cb-users-remove"
                           style={{
                             height: 38,
@@ -237,7 +240,7 @@ export const UsersSection: React.FC = () => {
                             opacity: isSelf ? 0.4 : 1,
                           }}
                         >
-                          Remove
+                          Revoke access
                         </button>
                       </div>
                     </UserRow>
@@ -250,18 +253,18 @@ export const UsersSection: React.FC = () => {
       )}
 
       <ConfirmDialog
-        open={pendingRemoval !== null}
-        title="Remove from the team?"
+        open={pendingRevoke !== null}
+        title="Revoke access?"
         message={
-          pendingRemoval
-            ? `Remove ${pendingRemoval.name || pendingRemoval.email} from the team? They lose all access until re-added.`
+          pendingRevoke
+            ? `Revoke ${pendingRevoke.name || pendingRevoke.email}? They lose all access until re-approved.`
             : undefined
         }
-        confirmLabel="Remove"
+        confirmLabel="Revoke access"
         cancelLabel="Cancel"
         danger
-        onConfirm={confirmRemove}
-        onCancel={() => setPendingRemoval(null)}
+        onConfirm={confirmRevoke}
+        onCancel={() => setPendingRevoke(null)}
       />
 
       {/* Hover affordances kept in CSS to avoid per-element JS state. */}

@@ -12,7 +12,6 @@ import {
   getAttachments, uploadAttachment, deleteAttachment,
 } from '../lib/api';
 import { NoteEditor, type EditorPeer } from './NoteEditor';
-import { SharePanel } from './SharePanel';
 import { ConfirmDialog } from './ConfirmDialog';
 
 const supabase = createClient();
@@ -38,7 +37,7 @@ const ico = (d: string, fill = 'none', sw = '1.8') => (
 );
 
 /**
- * Editor pane. Toolbar markup (breadcrumb, live presence, star, Share, overflow)
+ * Editor pane. Toolbar markup (breadcrumb, live presence, star, overflow)
  * lifted from designideas/design-references/CheatBook.dc.html (lines 240–266);
  * body eyebrow/title/tags from lines 381–390; attachments from lines 364–376.
  * All overflow actions are fully wired against lib/api.
@@ -57,26 +56,22 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
   const [peers, setPeers] = useState<EditorPeer[]>([]);
 
   // ── Overlays ────────────────────────────────────────────────────────
-  const [shareOpen, setShareOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [imageNonce, setImageNonce] = useState(0);
 
-  // Command-palette bridge: ?share=1 opens the Share panel; ?upload=1 triggers
-  // the image picker. Both strip their param after handling.
+  // Command-palette bridge: ?upload=1 triggers the image picker, then strips
+  // its param after handling.
   useEffect(() => {
-    const wantShare = router.query.share === '1';
-    const wantUpload = router.query.upload === '1';
-    if (!wantShare && !wantUpload) return;
-    if (wantShare) setShareOpen(true);
-    if (wantUpload) setImageNonce((n) => n + 1);
+    if (router.query.upload !== '1') return;
+    setImageNonce((n) => n + 1);
     const rest = { ...router.query };
-    delete rest.share; delete rest.upload;
+    delete rest.upload;
     void router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.query.share, router.query.upload]);
+  }, [router.query.upload]);
 
   // ── Editable title (uncontrolled-ish: blur commits) ─────────────────
   const [title, setTitle] = useState(note.title);
@@ -339,21 +334,6 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
             </svg>
           </button>
 
-          {/* Share */}
-          <button
-            type="button"
-            onClick={() => setShareOpen(true)}
-            className="flex cursor-pointer items-center gap-[7px] font-bold hover:brightness-[1.07]"
-            style={{
-              height: 32, minHeight: 44, padding: '0 14px', borderRadius: 10, fontSize: 12.5,
-              color: 'var(--text-on-accent)', background: 'var(--accent-grad)',
-              boxShadow: '0 6px 16px -6px rgba(110,168,254,0.8)',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-on-accent)" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="12" r="2.4" /><circle cx="18" cy="6" r="2.4" /><circle cx="18" cy="18" r="2.4" /><path d="M8.1 10.9l7.8-3.8M8.1 13.1l7.8 3.8" /></svg>
-            Share
-          </button>
-
           {/* overflow */}
           <div className="relative">
             <button
@@ -488,8 +468,6 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
       </div>
 
       {/* ── overlays ────────────────────────────────────────────── */}
-      <SharePanel noteId={note.id} open={shareOpen} onClose={() => setShareOpen(false)} />
-
       {moveOpen && (
         <SpacePickerDialog
           currentSpaceId={note.spaceId}
@@ -578,7 +556,7 @@ const SpacePickerDialog: React.FC<{
 
 // ── Version history (read-only, from activity_log filtered to this note) ──
 const VersionHistoryDialog: React.FC<{ noteId: string; onClose: () => void }> = ({ noteId, onClose }) => {
-  const { teamId, memberById } = useApp();
+  const { memberById } = useApp();
   const ref = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<ActivityEvent[]>([]);
@@ -591,11 +569,10 @@ const VersionHistoryDialog: React.FC<{ noteId: string; onClose: () => void }> = 
   }, [onClose]);
 
   useEffect(() => {
-    if (!teamId) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
       try {
-        const all = await getActivity(supabase, teamId, 100);
+        const all = await getActivity(supabase, 100);
         if (cancelled) return;
         setEvents(all.filter((e) => e.targetId === noteId));
       } catch {
@@ -605,7 +582,7 @@ const VersionHistoryDialog: React.FC<{ noteId: string; onClose: () => void }> = 
       }
     })();
     return () => { cancelled = true; };
-  }, [teamId, noteId]);
+  }, [noteId]);
 
   return (
     <div

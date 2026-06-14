@@ -55,9 +55,6 @@ const IconHome = () => (
 const IconNotes = () => (
   <svg style={{ position: 'relative', flex: '0 0 auto' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2.5" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>
 );
-const IconShared = () => (
-  <svg style={{ position: 'relative', flex: '0 0 auto' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="12" r="2.4" /><circle cx="18" cy="6" r="2.4" /><circle cx="18" cy="18" r="2.4" /><path d="M8.1 10.9l7.8-3.8M8.1 13.1l7.8 3.8" /></svg>
-);
 const IconStar = () => (
   <svg style={{ position: 'relative', flex: '0 0 auto' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9z" /></svg>
 );
@@ -547,7 +544,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode, onCollapse, onExpand }) 
   const path = router.pathname;
   const isDashboard = path === '/';
   const isAllNotes = path === '/notes' || path.startsWith('/notes/');
-  const isShared = path === '/shared';
   const isStarred = path === '/starred';
   const activeSpaceId = router.pathname === '/notes' ? (router.query.space as string | undefined) : undefined;
 
@@ -670,7 +666,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode, onCollapse, onExpand }) 
         <nav style={{ padding: '0 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           <NavRow active={isDashboard} showLabels={showLabels} center={center} label="Home" icon={<IconHome />} onClick={() => go('/')} />
           <NavRow active={isAllNotes} showLabels={showLabels} center={center} label="All Notes" count={notes.length} icon={<IconNotes />} onClick={() => go('/notes')} />
-          <NavRow active={isShared} showLabels={showLabels} center={center} label="Shared with me" icon={<IconShared />} onClick={() => go('/shared')} />
           <NavRow active={isStarred} showLabels={showLabels} center={center} label="Starred" count={starredCount} icon={<IconStar />} onClick={() => go('/starred')} />
         </nav>
 

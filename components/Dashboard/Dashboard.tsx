@@ -122,7 +122,7 @@ export const Dashboard: React.FC = () => {
   const dashPad = isMobile ? '22px 16px 48px' : '34px 40px 60px';
 
   // ── Pending state ─────────────────────────────────────────────────────
-  // Authed but not yet on the team (awaiting an admin add). RLS returns no
+  // Authed but not yet approved (awaiting an admin). RLS returns no
   // notes/spaces/members, so the normal tiles would be empty and meaningless —
   // show only a welcome/pending card on the glass shell instead.
   if (isPending) {
@@ -181,7 +181,7 @@ export const Dashboard: React.FC = () => {
               CHEATBOOK / ACCESS PENDING
             </div>
             <h1 className="m-0 text-text" style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em' }}>
-              You&apos;re not on the team yet
+              Access pending
             </h1>
             <p
               style={{
@@ -192,7 +192,7 @@ export const Dashboard: React.FC = () => {
                 maxWidth: 420,
               }}
             >
-              An admin needs to add you to CheatBook before you can see notes and spaces.
+              An admin needs to approve your access before you can see notes.
               Check back once you&apos;ve been approved.
             </p>
             {me?.name && (

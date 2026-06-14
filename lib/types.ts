@@ -1,8 +1,6 @@
 // ─── CheatBook domain models (UI-facing shapes derived from the DB) ───
 import type { Json } from './database.types';
 
-export type Permission = 'owner' | 'edit' | 'view';
-
 export interface Space {
   id: string;
   name: string;        // notebooks.title
@@ -24,12 +22,13 @@ export interface Member {
   team: string | null;  // team_name (free text)
   status: string | null;
   avatarUrl: string | null;
-  role: string;         // team_members.role
+  role: string;         // 'admin' | 'member', sourced from profiles.is_admin
   online: boolean;      // derived from presence channel, never DB
 }
 
-// Admin-facing account row: a profile + its team membership/role. Distinct from
-// `Member` (team-scoped, presence-aware) — UserAccount spans pending users too.
+// Admin-facing account row: a profile with its platform access flags. Distinct
+// from `Member` (approved-only, presence-aware) — UserAccount spans not-yet-
+// approved users so admins can grant/revoke access.
 export interface UserAccount {
   id: string;
   name: string;
@@ -38,9 +37,8 @@ export interface UserAccount {
   initials: string;
   color: string;
   avatarUrl: string | null;
-  role: 'admin' | 'member' | null;
-  teamId: string | null;
-  pending: boolean;             // true while team_id is null (awaiting admin add)
+  isAdmin: boolean;
+  approved: boolean;
   createdAt?: string | null;
 }
 
@@ -85,19 +83,6 @@ export interface Attachment {
   uploadedAt: string;
 }
 
-export interface ShareGrant {
-  noteId: string;
-  userId: string;
-  permission: Permission;
-}
-
-export interface LinkShare {
-  noteId: string;
-  enabled: boolean;
-  scope: 'tenant' | 'anyone';
-  permission: 'view' | 'edit';
-}
-
 export interface ActivityEvent {
   id: string;
   actorId: string | null;
@@ -109,7 +94,7 @@ export interface ActivityEvent {
   createdAt: string;
 }
 
-export type Scope = 'all' | 'shared' | 'starred';
+export type Scope = 'all' | 'starred';
 export type FilterChip = 'all' | 'pinned' | 'starred' | 'runbooks';
 export type Density = 'compact' | 'balanced' | 'spacious';
 export type Theme = 'dark' | 'light';
