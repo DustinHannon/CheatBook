@@ -69,32 +69,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('[entra-sync] Graph /me threw:', e);
   }
 
-  // ── 2. Profile photo (best-effort; preserves a manual upload) ────────────
+  // ── 2. Profile photo as a base64 data URL on the profile (best-effort) ────
+  // We inline the M365 thumbnail rather than uploading to the storage bucket: the
+  // server-side bucket upload was rejected (a MIME quirk) and the thumbnail is
+  // tiny. profiles.avatar accepts any string and renders as an <img src>. Only
+  // (re)sync when the avatar is empty or itself Entra-sourced (a data: URL), so a
+  // manually uploaded avatar (a storage URL) is preserved.
   try {
     const { data: profile } = await supabase.from('profiles').select('avatar').eq('id', user.id).maybeSingle();
     const current: string = profile?.avatar ?? '';
-    const entraManaged = current === '' || current.includes('/entra.');
+    const entraManaged = current === '' || current.startsWith('data:') || current.includes('/entra.');
     if (entraManaged) {
-      const photoRes = await graph('/me/photo/$value');
+      // A small thumbnail keeps the inlined value lean; fall back to the default photo.
+      let photoRes = await graph('/me/photos/120x120/$value');
+      if (!photoRes.ok) photoRes = await graph('/me/photo/$value');
       if (photoRes.ok) {
         const contentType = photoRes.headers.get('content-type') || 'image/jpeg';
-        const ext = contentType.includes('png') ? 'png' : 'jpg';
         const buf = await photoRes.arrayBuffer();
-        if (buf.byteLength > 0 && buf.byteLength <= 5 * 1024 * 1024) {
-          const blob = new Blob([buf], { type: contentType });
-          const path = `${user.id}/entra.${ext}`;
-          const { data: up, error: upErr } = await supabase.storage
-            .from('avatars')
-            .upload(path, blob, { upsert: true, contentType });
-          if (upErr) {
-            console.error('[entra-sync] avatar upload failed:', upErr.message);
-          } else if (up) {
-            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(up.path);
-            const avatarUrl = `${urlData.publicUrl}?v=${Date.now()}`;
-            const { error: avErr } = await supabase.from('profiles').update({ avatar: avatarUrl }).eq('id', user.id);
-            if (avErr) console.error('[entra-sync] avatar profile update failed:', avErr.message);
-            else applied.push('avatar');
-          }
+        if (buf.byteLength > 0 && buf.byteLength <= 512 * 1024) {
+          const dataUrl = `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`;
+          const { error } = await supabase.from('profiles').update({ avatar: dataUrl }).eq('id', user.id);
+          if (error) console.error('[entra-sync] avatar update failed:', error.message);
+          else applied.push('avatar');
+        } else {
+          console.error('[entra-sync] photo empty or too large:', buf.byteLength);
         }
       } else if (photoRes.status !== 404) {
         console.error('[entra-sync] Graph photo failed:', photoRes.status, await photoRes.text());
