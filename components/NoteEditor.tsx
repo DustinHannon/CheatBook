@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useEditor, EditorContent, Editor, NodeViewWrapper, NodeViewContent, ReactNodeViewRenderer, type NodeViewProps } from '@tiptap/react';
+import { useEditor, EditorContent, NodeViewWrapper, NodeViewContent, ReactNodeViewRenderer, type NodeViewProps } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration, { isChangeOrigin } from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
@@ -246,7 +246,7 @@ const EditorInner: React.FC<InnerProps> = ({
   }, [editor, status, ydoc, note.body]);
 
   // Keep ProseMirror editability in sync with the live lock state (note.isLocked
-  // can flip via the realtime team subscription without remounting the editor).
+  // can flip via the realtime notes channel without remounting the editor).
   useEffect(() => { editor?.setEditable(editable); }, [editor, editable]);
 
   // Open the image picker when the parent bumps imageNonce (palette upload action).
@@ -315,4 +315,3 @@ const EditorInner: React.FC<InnerProps> = ({
 };
 
 export default NoteEditor;
-export type { Editor };

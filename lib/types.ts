@@ -50,7 +50,7 @@ export interface Note {
   spaceId: string | null;
   title: string;
   ownerId: string;
-  collaboratorIds: string[];   // everyone with explicit access (incl. owner)
+  collaboratorIds: string[];   // the note owner only (0-or-1 element; sharing was removed)
   body: NoteBody;              // TipTap JSON
   snippet: string;            // derived preview text
   tags: string[];
@@ -87,7 +87,7 @@ export interface ActivityEvent {
   id: string;
   actorId: string | null;
   actorName: string;
-  verb: string;            // 'is editing' | 'commented on' | 'uploaded ... to' | 'created' | 'shared' ...
+  verb: string;            // 'created' | 'deleted' (verbs currently written by logActivity); legacy rows may hold others
   targetTitle: string | null;
   targetId: string | null;
   spaceColor: string;

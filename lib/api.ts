@@ -11,7 +11,7 @@ import type { Json } from './database.types';
 type DB = SupabaseClient;
 
 // ─── Auth helper ──────────────────────────────────────────────────────
-export async function getCurrentUser(supabase: DB) {
+async function getCurrentUser(supabase: DB) {
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.user) return session.user;
   const { data: { user } } = await supabase.auth.getUser();
@@ -146,18 +146,9 @@ export async function updateSpace(
   if (error) throw error;
 }
 
-/**
- * Delete a space. Notes are FK-bound to notebook_id, so deleting a non-empty
- * space would error; callers must move/delete its notes first (we surface the
- * note count in the UI confirmation). Returns the number of notes still in it.
- */
-export async function getSpaceNoteCount(supabase: DB, spaceId: string): Promise<number> {
-  const { count, error } = await supabase
-    .from('notes').select('id', { count: 'exact', head: true }).eq('notebook_id', spaceId);
-  if (error) throw error;
-  return count ?? 0;
-}
-
+// Delete a space. Its notes are removed via the notes_notebook_id_fkey
+// ON DELETE CASCADE; the count shown in the delete confirmation comes from the
+// cached space.noteCount (getSpaces' notes(count) join), not a separate query.
 export async function deleteSpace(supabase: DB, spaceId: string): Promise<void> {
   const { error } = await supabase.from('notebooks').delete().eq('id', spaceId);
   if (error) throw error;
@@ -223,15 +214,6 @@ export async function getNotes(supabase: DB): Promise<Note[]> {
   ]);
   if (error) throw error;
   return (data || []).map((n: any) => mapNote(n, starred));
-}
-
-export async function getNote(supabase: DB, noteId: string): Promise<Note> {
-  const [{ data, error }, starred] = await Promise.all([
-    supabase.from('notes').select(NOTE_SELECT).eq('id', noteId).single(),
-    getStarredSet(supabase),
-  ]);
-  if (error) throw error;
-  return mapNote(data, starred);
 }
 
 export async function createNote(supabase: DB, spaceId: string, title = 'Untitled note'): Promise<Note> {
@@ -354,7 +336,7 @@ export async function searchNotes(supabase: DB, query: string): Promise<Note[]> 
 // The 'images' bucket is private; objects are never served by public URL.
 // Both inline images and attachments store/return this proxy path, which the
 // auth-checked `/api/file` route resolves to a short-lived signed URL.
-export function fileUrl(path: string): string {
+function fileUrl(path: string): string {
   return '/api/file?path=' + encodeURIComponent(path);
 }
 
@@ -395,7 +377,7 @@ export async function getAttachments(supabase: DB, noteId: string): Promise<Atta
   }));
 }
 
-export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
 export async function uploadAttachment(supabase: DB, noteId: string, file: File): Promise<Attachment> {
   if (file.size > MAX_ATTACHMENT_BYTES) throw new Error(`File too large (max ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB).`);
@@ -426,9 +408,9 @@ export async function deleteAttachment(supabase: DB, id: string): Promise<void> 
 }
 
 // ─── Image upload (inline editor images + avatars) ────────────────────
-export const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-export const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
 function assertImage(file: File, maxBytes: number) {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) throw new Error('Unsupported image type. Use PNG, JPG, GIF or WebP.');

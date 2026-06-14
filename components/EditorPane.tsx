@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import type { Note, Attachment, ActivityEvent } from '../lib/types';
 import { useApp } from './AppContext';
 import { useToast } from './Toast';
-import { hexa, avatarTokens } from '../lib/colors';
+import { hexa, avatarTokens, initials } from '../lib/colors';
 import { relativeTime, fileSize } from '../lib/time';
 import { docToMarkdown } from '../lib/blocks';
 import { createClient } from '../lib/supabase/client';
@@ -202,7 +202,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
     try {
       await setLocked(supabase, note.id, !note.isLocked);
       void refreshNotes();
-      showToast(note.isLocked ? 'Note unlocked.' : 'Note locked — editing disabled for the team.', 'success');
+      showToast(note.isLocked ? 'Note unlocked.' : 'Note locked — editing disabled for everyone.', 'success');
     } catch {
       showToast('Could not change the lock state.', 'error');
     }
@@ -291,7 +291,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
               <div className="flex items-center">
                 {peers.slice(0, 3).map((p) => {
                   const t = avatarTokens(p.color);
-                  const init = p.name.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+                  const init = initials(p.name);
                   return (
                     <div
                       key={p.id}
@@ -481,7 +481,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
         open={deleteOpen}
         danger
         title="Delete this note?"
-        message="This permanently removes the note for the whole team. This cannot be undone."
+        message="This permanently removes the note for everyone. This cannot be undone."
         confirmLabel="Delete note"
         onConfirm={() => void doDelete()}
         onCancel={() => setDeleteOpen(false)}

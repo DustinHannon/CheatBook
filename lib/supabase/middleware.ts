@@ -55,8 +55,5 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Team setup redirect is handled client-side by TeamContext + dashboard useEffect
-  // to avoid race conditions with server-side middleware
-
   return supabaseResponse;
 }

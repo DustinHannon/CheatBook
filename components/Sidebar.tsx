@@ -832,7 +832,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode, onCollapse, onExpand }) 
         title="Delete this space?"
         message={
           deleteTarget && deleteTarget.noteCount > 0
-            ? `“${deleteTarget.name}” and its ${deleteTarget.noteCount} note${deleteTarget.noteCount === 1 ? '' : 's'} will be permanently deleted for the whole team. This cannot be undone.`
+            ? `“${deleteTarget.name}” and its ${deleteTarget.noteCount} note${deleteTarget.noteCount === 1 ? '' : 's'} will be permanently deleted for everyone. This cannot be undone.`
             : `“${deleteTarget?.name ?? ''}” will be permanently deleted. This cannot be undone.`
         }
         confirmLabel="Delete space"

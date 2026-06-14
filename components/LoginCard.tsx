@@ -166,7 +166,7 @@ export const LoginCard: React.FC = () => {
             textAlign: 'center',
           }}
         >
-          Access the team&apos;s runbooks, incidents and knowledge.
+          Access the org&apos;s runbooks, incidents and knowledge.
         </p>
 
         {/* Entra SSO (primary) */}
