@@ -464,44 +464,72 @@ export const Dashboard: React.FC = () => {
                 activity.map((a) => {
                   const actor = a.actorId ? memberById(a.actorId) : undefined;
                   const color = actor?.color || a.spaceColor || '#6ea8fe';
-                  return (
+                  // The activity row stores the target title as a SNAPSHOT taken
+                  // at log time, so a note created as "Untitled note" then renamed
+                  // would show the stale title forever. Resolve the note's CURRENT
+                  // title from the live list instead; a deleted/non-note target
+                  // isn't in `notes`, so it falls back to the stored snapshot and
+                  // stays non-clickable.
+                  const liveNote = a.targetId ? notes.find((n) => n.id === a.targetId) : undefined;
+                  const displayTitle = liveNote?.title || a.targetTitle;
+                  const onOpen = liveNote ? () => openNote(liveNote.id) : undefined;
+
+                  const avatar = actor ? (
+                    <Avatar
+                      name={actor.name}
+                      color={actor.color}
+                      avatarUrl={actor.avatarUrl}
+                      size={28}
+                      ring={false}
+                      className="!flex-none"
+                    />
+                  ) : (
+                    <div
+                      className="grid flex-none place-items-center rounded-full font-mono font-bold"
+                      style={{
+                        width: 28, height: 28, fontSize: 10,
+                        color, background: hexa(color, 0.18), border: '1.5px solid var(--surface-raised)',
+                      }}
+                    >
+                      {a.actorName.slice(0, 2).toUpperCase()}
+                    </div>
+                  );
+
+                  const body = (
+                    <div className="min-w-0 flex-1" style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-3)' }}>
+                      <strong style={{ color: 'var(--text)', fontWeight: 700 }}>{a.actorName}</strong>{' '}
+                      {a.verb}{' '}
+                      {displayTitle && (
+                        <span style={{ color: a.spaceColor || '#6ea8fe', fontWeight: 600 }}>
+                          {displayTitle}
+                        </span>
+                      )}
+                      <div className="font-mono" style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 3 }}>
+                        {relativeTime(a.createdAt)}
+                      </div>
+                    </div>
+                  );
+
+                  return onOpen ? (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={onOpen}
+                      title={`Open ${displayTitle || 'note'}`}
+                      className="flex w-full gap-3 text-left transition-colors hover:bg-[var(--bg-hover-2)]"
+                      style={{ padding: '9px 0', borderBottom: '1px solid var(--hairline)', cursor: 'pointer' }}
+                    >
+                      {avatar}
+                      {body}
+                    </button>
+                  ) : (
                     <div
                       key={a.id}
                       className="flex gap-3"
                       style={{ padding: '9px 0', borderBottom: '1px solid var(--hairline)' }}
                     >
-                      {actor ? (
-                        <Avatar
-                          name={actor.name}
-                          color={actor.color}
-                          avatarUrl={actor.avatarUrl}
-                          size={28}
-                          ring={false}
-                          className="!flex-none"
-                        />
-                      ) : (
-                        <div
-                          className="grid flex-none place-items-center rounded-full font-mono font-bold"
-                          style={{
-                            width: 28, height: 28, fontSize: 10,
-                            color, background: hexa(color, 0.18), border: '1.5px solid var(--surface-raised)',
-                          }}
-                        >
-                          {a.actorName.slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1" style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-3)' }}>
-                        <strong style={{ color: 'var(--text)', fontWeight: 700 }}>{a.actorName}</strong>{' '}
-                        {a.verb}{' '}
-                        {a.targetTitle && (
-                          <span style={{ color: a.spaceColor || '#6ea8fe', fontWeight: 600 }}>
-                            {a.targetTitle}
-                          </span>
-                        )}
-                        <div className="font-mono" style={{ fontSize: 10, color: 'var(--text-4)', marginTop: 3 }}>
-                          {relativeTime(a.createdAt)}
-                        </div>
-                      </div>
+                      {avatar}
+                      {body}
                     </div>
                   );
                 })
