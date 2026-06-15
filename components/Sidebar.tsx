@@ -525,7 +525,7 @@ const SpaceManageDialog: React.FC<{
 
 export const Sidebar: React.FC<SidebarProps> = ({ mode, onCollapse, onExpand }) => {
   const router = useRouter();
-  const { notes, spaces, me, members, openPalette, toggleAccount, closeNav, createSpace, updateSpace, deleteSpace, starredCount } = useApp();
+  const { notes, spaces, me, members, openPalette, toggleAccount, closeNav, createSpace, updateSpace, deleteSpace, starredCount, isAdmin } = useApp();
   const { user: authUser } = useAuth();
   const { onlineCount } = usePresence();
   const { showToast } = useToast();
@@ -684,9 +684,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode, onCollapse, onExpand }) 
               <span className="cb-mono" style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-4)' }}>
                 SPACES
               </span>
-              <IconButton title="New space" ariaLabel="Create space" bordered={false} size={22} onClick={() => setSpaceDialogOpen(true)}>
-                <IconPlus />
-              </IconButton>
+              {/* Spaces are admin-managed (RLS: only is_app_admin can write notebooks). */}
+              {isAdmin && (
+                <IconButton title="New space" ariaLabel="Create space" bordered={false} size={22} onClick={() => setSpaceDialogOpen(true)}>
+                  <IconPlus />
+                </IconButton>
+              )}
             </>
           ) : (
             <div style={{ width: '100%', height: 1, background: 'var(--hairline)' }} />
@@ -715,12 +718,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode, onCollapse, onExpand }) 
               center={center}
               active={activeSpaceId === sp.id}
               onClick={() => go('/notes?space=' + sp.id)}
-              onManage={showLabels ? () => setManageSpace(sp) : undefined}
+              onManage={showLabels && isAdmin ? () => setManageSpace(sp) : undefined}
             />
           ))}
           {showLabels && spaces.length === 0 && (
             <div className="cb-mono" style={{ padding: '10px 12px', fontSize: 11, color: 'var(--text-4)' }}>
-              No spaces yet — add one with +
+              {isAdmin ? 'No spaces yet — add one with +' : 'No spaces yet.'}
             </div>
           )}
         </div>

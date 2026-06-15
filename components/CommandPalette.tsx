@@ -49,7 +49,7 @@ type Row =
 
 export const CommandPalette: React.FC = () => {
   const router = useRouter();
-  const { paletteOpen, closePalette, notes, spaces, createNote, createSpace } = useApp();
+  const { paletteOpen, closePalette, notes, spaces, createNote, createSpace, isAdmin } = useApp();
   const { showToast } = useToast();
 
   const [query, setQuery] = useState('');
@@ -108,18 +108,24 @@ export const CommandPalette: React.FC = () => {
 
   // ── Quick action definitions + their handlers ─────────────────────────
   const runCreateNote = useCallback(async () => {
-    // No spaces yet → route the user into creating one instead of dead-ending.
+    // No spaces yet → admins get routed into creating one; non-admins can't
+    // (spaces are admin-only), so point them at an admin rather than opening a
+    // create-space dialog whose write RLS would reject them.
     if (!firstSpaceId) {
       closePalette();
-      setSpaceDialogOpen(true);
-      showToast('Create a space first, then add notes to it.', 'info');
+      if (isAdmin) {
+        setSpaceDialogOpen(true);
+        showToast('Create a space first, then add notes to it.', 'info');
+      } else {
+        showToast('No spaces yet — ask an admin to create one.', 'info');
+      }
       return;
     }
     closePalette();
     const note = await createNote(firstSpaceId);
     if (note) router.push('/notes/' + note.id);
     else showToast('Could not create note.', 'error');
-  }, [closePalette, firstSpaceId, createNote, router, showToast]);
+  }, [closePalette, firstSpaceId, isAdmin, createNote, router, showToast]);
 
   const runCreateSpace = useCallback(() => {
     closePalette();
@@ -150,10 +156,12 @@ export const CommandPalette: React.FC = () => {
 
   const actionDefs = useMemo<ActionDef[]>(() => [
     { id: 'new', label: 'Create a new note', pathD: PATH_NEW, hotkey: 'N', run: runCreateNote },
-    { id: 'space', label: 'Create a space', pathD: PATH_SPACE, run: runCreateSpace },
+    // Spaces are admin-managed (RLS: only is_app_admin can write notebooks), so
+    // only admins get the create-space action.
+    ...(isAdmin ? [{ id: 'space', label: 'Create a space', pathD: PATH_SPACE, run: runCreateSpace }] : []),
     { id: 'dashboard', label: 'Go to Dashboard', pathD: PATH_DASHBOARD, run: runDashboard },
     { id: 'upload', label: 'Upload an image to this note', pathD: PATH_UPLOAD, run: runUpload },
-  ], [runCreateNote, runCreateSpace, runDashboard, runUpload]);
+  ], [isAdmin, runCreateNote, runCreateSpace, runDashboard, runUpload]);
 
   // Quick actions filtered by label (mirrors reference logic).
   const actionHits = useMemo<ActionDef[]>(
