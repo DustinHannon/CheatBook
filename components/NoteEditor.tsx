@@ -197,7 +197,14 @@ const EditorInner: React.FC<InnerProps> = ({
       TaskList,
       TaskItem.configure({ nested: true }),
       ImageBlock,
-      Placeholder.configure({ placeholder: 'Start writing — or add a block below…' }),
+      Placeholder.configure({
+        // Prompt only on an empty paragraph. With a static string the SAME text
+        // renders inside an empty code block: when the block is the doc's only
+        // node it is both :first-child AND .is-editor-empty, so the placeholder
+        // CSS prints "Start writing…" under the code-block window dots. Returning
+        // '' for non-paragraph nodes keeps the prompt off code blocks/headings.
+        placeholder: ({ node }) => (node.type.name === 'paragraph' ? 'Start writing — or add a block below…' : ''),
+      }),
       Collaboration.configure({ document: ydoc }),
       CollaborationCaret.configure({
         provider,
