@@ -26,7 +26,7 @@ tenant app registration secret that can't be self-provisioned. Steps:
 3. **Certificates & secrets → New client secret.** Copy the secret **Value**.
 4. **API permissions:** Microsoft Graph → delegated `email`, `openid`, `profile`, `User.Read` → Grant admin consent. (`User.Read` is also what lets CheatBook sync each user's Microsoft 365 profile photo into their avatar on sign-in.)
 5. **Supabase dashboard → Authentication → Providers → Azure:** enable it; paste Client ID, Client Secret, and set the **Azure Tenant URL** to `https://login.microsoftonline.com/<your-tenant-id>`.
-6. **Supabase → Authentication → URL Configuration:** add `https://thecheatbook.vercel.app` (and `http://localhost:3000` for dev) to redirect URLs; Site URL = the Vercel prod URL.
+6. **Supabase → Authentication → URL Configuration:** set Site URL = `https://cheatbook.morganwhite.com`; add `https://cheatbook.morganwhite.com`, `https://thecheatbook.vercel.app` (legacy), and `http://localhost:3000` (dev) to the redirect allow-list. The OAuth `redirectTo` is built from `window.location.origin` at runtime (`AuthContext.tsx`), so every origin the app is served from must be allow-listed here or Supabase rejects the post-login redirect. The Entra app registration's redirect URI stays `…supabase.co/auth/v1/callback` — it does **not** change with the app domain.
 7. **Vercel → Project → Settings → Environment Variables:** add `NEXT_PUBLIC_ENTRA_ENABLED=true` and redeploy.
 
 Once enabled, the white **"Sign in with Microsoft Entra ID"** button starts the real

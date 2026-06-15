@@ -30,7 +30,7 @@ detail-obsessed tester. You will:
 
 ## Standing facts for this run
 
-- **Target:** `https://thecheatbook.vercel.app` (production). This is the ONLY environment
+- **Target:** `https://cheatbook.morganwhite.com` (production). This is the ONLY environment
   — there is no staging/test mode. You therefore operate on REAL team data and MUST stay
   inside the guardrails below.
 - **Auth:** email + password. Credentials are read from
@@ -99,7 +99,7 @@ Use `TodoWrite` to create one todo per phase below, then work them in order.
    ```json
    {
      "tool": "CheatBook QA Agent",
-     "environment": "https://thecheatbook.vercel.app",
+     "environment": "https://cheatbook.morganwhite.com",
      "account": "<email from credentials, NEVER the password>",
      "runTag": "<runTag>",
      "requestedDuration": "<as the user said>",
@@ -135,7 +135,7 @@ OR something genuinely good — capture it:
 2. **Append one JSON line** to `<REPORT_DIR>\findings.jsonl` (`Add-Content` or Bash
    `printf '%s\n' '<json>' >> file`). One finding per line (omit fields you don't have):
    ```json
-   {"id":"F012","ts":"2026-06-11T21:30:00","severity":"Major","category":"Editor","title":"Pasted image does not appear in the note","location":{"url":"https://thecheatbook.vercel.app/notes/<id>","route":"/notes/[id]","viewport":"1440x900"},"steps":["Open a note","Paste a screenshot into the body"],"expected":"Image inserts inline at the cursor and persists","actual":"Nothing happens; reload shows no image","evidence":{"screenshot":"screenshots/F012.png","console":"<related console error>","network":"<status + endpoint>"},"userComplaint":"I pasted a screenshot and it just vanished.","suggestion":"Insert the uploaded image at the caret and persist via auto-save.","frequency":"every time"}
+   {"id":"F012","ts":"2026-06-11T21:30:00","severity":"Major","category":"Editor","title":"Pasted image does not appear in the note","location":{"url":"https://cheatbook.morganwhite.com/notes/<id>","route":"/notes/[id]","viewport":"1440x900"},"steps":["Open a note","Paste a screenshot into the body"],"expected":"Image inserts inline at the cursor and persists","actual":"Nothing happens; reload shows no image","evidence":{"screenshot":"screenshots/F012.png","console":"<related console error>","network":"<status + endpoint>"},"userComplaint":"I pasted a screenshot and it just vanished.","suggestion":"Insert the uploaded image at the caret and persist via auto-save.","frequency":"every time"}
    ```
    - `severity` ∈ `Blocker | Critical | Major | Minor | Cosmetic | UX-suggestion | Positive`.
    - Use `Positive` for things that work well / feel fast — the report shows both sides.
@@ -164,7 +164,7 @@ log is what teardown deletes — accuracy here is what keeps the database clean.
 - `Read` `.claude/qa-agent/credentials.local.json`. If it's missing or lacks email/password,
   log a **Blocker** ("no credentials — set .claude/qa-agent/credentials.local.json"), do a
   read-only QA of the public `/login` page only, and skip to Phase 11 (still produce a report).
-- `browser_navigate` → `https://thecheatbook.vercel.app/login`. QA the login screen per the
+- `browser_navigate` → `https://cheatbook.morganwhite.com/login`. QA the login screen per the
   rubric (label clarity, Enter-to-submit, focus, error on empty + malformed email — note the
   message quality). Then sign in with the credentials. **Do not echo the password anywhere.**
 - Confirm you land on the Dashboard (`/`). If redirected to `/team-setup`, the account has no

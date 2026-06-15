@@ -4,7 +4,7 @@ A dark, glassmorphic knowledge app for an IT & Engineering org — runbooks, inc
 onboarding, and the tribal knowledge you need to remember years later. Real-time collaborative
 block editing with live cursors, organized into colored Spaces.
 
-**Live:** [thecheatbook.vercel.app](https://thecheatbook.vercel.app)
+**Live:** [cheatbook.morganwhite.com](https://cheatbook.morganwhite.com)
 
 ## Tech stack
 

@@ -3,7 +3,7 @@
 Best-effort reference. **Always confirm what's actually on screen** — the UI may have shifted.
 
 ## Environment & auth
-- **URL:** `https://thecheatbook.vercel.app`
+- **URL:** `https://cheatbook.morganwhite.com`
 - **Auth:** email + password (Supabase Auth, email confirmation). Credentials live in
   `.claude/qa-agent/credentials.local.json` (gitignored). Never echo the password.
 - **Supabase project (teardown only):** `ccthpkbljqxwtugawcyc`.
