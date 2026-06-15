@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from '../lib/router-compat';
 import { useAuth } from './AuthContext';
 import { AuroraBackground } from './ui/AuroraBackground';
 

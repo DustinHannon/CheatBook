@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from '../lib/router-compat';
 import type { Note, Attachment, ActivityEvent } from '../lib/types';
 import { useApp } from './AppContext';
 import { useToast } from './Toast';
@@ -9,7 +9,7 @@ import { docToMarkdown } from '../lib/blocks';
 import { createClient } from '../lib/supabase/client';
 import {
   updateNoteMeta, duplicateNote, getActivity, setLocked,
-  getAttachments, uploadAttachment, deleteAttachment, safeFileHref,
+  getAttachments, uploadAttachment, deleteAttachment, safeFileHref, getNoteBody,
 } from '../lib/api';
 import { NoteEditor, type EditorPeer } from './NoteEditor';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -54,6 +54,24 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
 
   // ── Live editing peers (fed by NoteEditor) ──────────────────────────
   const [peers, setPeers] = useState<EditorPeer[]>([]);
+
+  // ── Lazy-loaded note body ───────────────────────────────────────────
+  // The notes list omits `body` to keep its payload small; fetch the real doc
+  // for the OPEN note here, BEFORE NoteEditor mounts, so the Yjs seeding gate
+  // always sees a real body. Critical invariant: never mount the editor with a
+  // missing/empty body for a note that actually has content — an empty seed would
+  // be snapshotted back and clobber it. On error we show a message, not the editor.
+  const [bodyDoc, setBodyDoc] = useState<Note['body']>(null);
+  const [bodyError, setBodyError] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setBodyDoc(null);
+    setBodyError(false);
+    getNoteBody(supabase, note.id)
+      .then((b) => { if (!cancelled) setBodyDoc(b); })
+      .catch(() => { if (!cancelled) setBodyError(true); });
+    return () => { cancelled = true; };
+  }, [note.id]);
 
   // ── Overlays ────────────────────────────────────────────────────────
   const [menuOpen, setMenuOpen] = useState(false);
@@ -182,9 +200,12 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
     }
   }, [note.id, refreshNotes, refreshSpaces, router, showToast]);
 
-  const doExport = useCallback(() => {
+  const doExport = useCallback(async () => {
     try {
-      const md = docToMarkdown(note.body, note.title);
+      // Use the already-loaded body when present; otherwise fetch it on demand
+      // (export can be triggered from the list before the editor mounts).
+      const body = bodyDoc ?? await getNoteBody(supabase, note.id);
+      const md = docToMarkdown(body, note.title);
       const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -197,7 +218,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
     } catch {
       showToast('Could not export note.', 'error');
     }
-  }, [note.body, note.title, showToast]);
+  }, [bodyDoc, note.id, note.title, showToast]);
 
   const doMove = useCallback(async (spaceId: string) => {
     setMoveOpen(false);
@@ -460,17 +481,22 @@ export const EditorPane: React.FC<EditorPaneProps> = ({ note, onBack }) => {
             )}
           </div>
 
-          {/* collaborative body */}
-          {me && (
+          {/* collaborative body — the lazy body must finish loading before the
+              editor mounts so Yjs seeding sees real content (never an empty seed) */}
+          {me && bodyDoc !== null ? (
             <NoteEditor
-              note={note}
+              note={{ ...note, body: bodyDoc }}
               me={me}
               editable={!note.isLocked}
               onPeersChange={setPeers}
               onAttach={note.isLocked ? undefined : () => attachInputRef.current?.click()}
               imageNonce={imageNonce}
             />
-          )}
+          ) : me && bodyError ? (
+            <div className="px-1 py-8 text-sm text-text-3">Couldn’t load this note’s content. Refresh to try again.</div>
+          ) : me ? (
+            <div className="px-1 py-8 text-sm text-text-3">Loading note…</div>
+          ) : null}
 
           {/* attachments */}
           <AttachmentsSection noteId={note.id} locked={note.isLocked} inputRef={attachInputRef} />

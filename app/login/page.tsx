@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { useAuth } from '../components/AuthContext';
-import { LoginCard } from '../components/LoginCard';
-import { AuroraBackground } from '../components/ui/AuroraBackground';
+'use client';
+import { useEffect } from 'react';
+import { useRouter } from '../../lib/router-compat';
+import { useAuth } from '../../components/AuthContext';
+import { LoginCard } from '../../components/LoginCard';
+import { AuroraBackground } from '../../components/ui/AuroraBackground';
 
 export default function LoginPage() {
   const { isAuthenticated, isLoading } = useAuth();

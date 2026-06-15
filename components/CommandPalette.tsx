@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from '../lib/router-compat';
 import { createClient } from '../lib/supabase/client';
 import { useApp } from './AppContext';
 import { useToast } from './Toast';

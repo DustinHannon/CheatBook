@@ -1,3 +1,4 @@
+'use client';
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode, useMemo } from 'react';
 import { createClient } from '../lib/supabase/client';
 import { useAuth } from './AuthContext';
@@ -10,6 +11,7 @@ import {
   updateSpace as apiUpdateSpace, deleteSpace as apiDeleteSpace, logActivity,
 } from '../lib/api';
 import type { Member, Space, Note, ActivityEvent } from '../lib/types';
+import type { InitialAppData } from '../lib/initial-data';
 
 // Single platform now — the live channel is keyed on a constant, not a team.
 const PLATFORM_CHANNEL = 'cb-platform';
@@ -55,23 +57,29 @@ type AppContextType = {
 const AppContext = createContext<AppContextType>({} as AppContextType);
 const supabase = createClient();
 
-export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user, isAuthenticated } = useAuth();
+export const AppProvider: React.FC<{ children: ReactNode; initialData?: InitialAppData | null }> = ({ children, initialData }) => {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { onlineIds } = usePresence();
 
-  const [loading, setLoading] = useState(true);
-  const [approved, setApproved] = useState(false);
-  const [me, setMe] = useState<Member | null>(null);
-  const [rawMembers, setRawMembers] = useState<Member[]>([]);
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  // Server-prefetched payload (root layout RSC) seeds initial state so the first
+  // paint already has real data and we skip the post-hydration fetch waterfall.
+  const [loading, setLoading] = useState(!initialData);
+  const [approved, setApproved] = useState(initialData?.approved ?? false);
+  const [me, setMe] = useState<Member | null>(initialData?.me ?? null);
+  const [rawMembers, setRawMembers] = useState<Member[]>(initialData?.members ?? []);
+  const [spaces, setSpaces] = useState<Space[]>(initialData?.spaces ?? []);
+  const [notes, setNotes] = useState<Note[]>(initialData?.notes ?? []);
+  const [activity, setActivity] = useState<ActivityEvent[]>(initialData?.activity ?? []);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
 
-  const approvedRef = useRef(false);
+  const approvedRef = useRef(initialData?.approved ?? false);
+  // True when server-prefetched data already populated state for this user, so
+  // the initial-load effect can skip the redundant client fetch (realtime keeps
+  // it fresh). Consumed once, so a later user switch / re-auth still refetches.
+  const hydratedRef = useRef<boolean>(!!initialData);
   // Mirrors of list state so data ops can read current values without taking
   // notes/spaces as deps (which would re-create the live-channel effect).
   const notesRef = useRef<Note[]>([]);
@@ -105,46 +113,60 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Initial load on auth.
   useEffect(() => {
+    // Wait for auth to resolve before touching state — on first mount after a
+    // server-hydrated refresh, AuthContext is still loading (user null). Clearing
+    // here would wipe the server-seeded data and force a redundant refetch.
+    if (authLoading) return;
     if (!isAuthenticated || !user) {
-      // Clear all derived state on logout/user-switch so the prior session's data
-      // can't linger and the live platform channel tears down.
+      // Definitive logout/user-switch: clear all derived state so the prior
+      // session's data can't linger and the live platform channel tears down.
       approvedRef.current = false;
+      hydratedRef.current = false;
       setApproved(false); setMe(null); setRawMembers([]); setSpaces([]); setNotes([]); setActivity([]);
       setLoading(false);
+      return;
+    }
+    // Server already prefetched this exact user's data — skip the initial client
+    // fetch (the realtime channel keeps it live). Consume the flag so a later
+    // user switch / re-auth refetches normally.
+    if (hydratedRef.current && initialData && user.id === initialData.me.id) {
+      hydratedRef.current = false;
       return;
     }
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        // One profile read does double duty: it IS the current Member AND carries
-        // the binary `approved` flag — no separate pre-flight round-trip, and the
-        // current-user profile is no longer fetched twice.
-        const meMember = await getCurrentMember(supabase);
+        // Fire all five reads in parallel — no serial getCurrentMember pre-flight.
+        // getCurrentMember carries the binary `approved` flag, and RLS returns
+        // empty sets to unapproved callers, so over-fetching for a pending user is
+        // harmless. List reads are cheap now that `body` is no longer fetched.
+        const [meRes, membersRes, spacesRes, notesRes, activityRes] = await Promise.allSettled([
+          getCurrentMember(supabase),
+          getMembers(supabase),
+          getSpaces(supabase),
+          getNotes(supabase),
+          getActivity(supabase),
+        ]);
         if (cancelled) return;
+        if (meRes.status !== 'fulfilled') return; // not authenticated / transient — leave state
+        const meMember = meRes.value;
         const isApproved = meMember.approved;
         approvedRef.current = isApproved;
         setApproved(isApproved);
         setMe(meMember);
-        const [membersRes, spacesRes, notesRes, activityRes] = await Promise.allSettled([
-          isApproved ? getMembers(supabase) : Promise.resolve([] as Member[]),
-          isApproved ? getSpaces(supabase) : Promise.resolve([] as Space[]),
-          isApproved ? getNotes(supabase) : Promise.resolve([] as Note[]),
-          isApproved ? getActivity(supabase) : Promise.resolve([] as ActivityEvent[]),
-        ]);
-        if (cancelled) return;
-        if (membersRes.status === 'fulfilled') setRawMembers(membersRes.value);
-        if (spacesRes.status === 'fulfilled') setSpaces(spacesRes.value);
-        if (notesRes.status === 'fulfilled') setNotes(notesRes.value);
-        if (activityRes.status === 'fulfilled') setActivity(activityRes.value);
-      } catch {
-        // getCurrentMember failed (rare: missing profile / transient) — leave state.
+        if (isApproved) {
+          if (membersRes.status === 'fulfilled') setRawMembers(membersRes.value);
+          if (spacesRes.status === 'fulfilled') setSpaces(spacesRes.value);
+          if (notesRes.status === 'fulfilled') setNotes(notesRes.value);
+          if (activityRes.status === 'fulfilled') setActivity(activityRes.value);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated, user]);
+  }, [authLoading, isAuthenticated, user, initialData]);
 
   // Live platform updates: refetch on relevant DB changes (debounced). A note
   // change affects BOTH the notes list and per-space note counts, so it refreshes

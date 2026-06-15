@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { Note, Scope, FilterChip } from '../lib/types';
 import { useApp } from './AppContext';
 import { NoteCard } from './NoteCard';
@@ -50,6 +50,27 @@ export const NoteList: React.FC<NoteListProps> = ({
   const subtitle = subtitleFor(scope);
   const showChips = scope === 'all';
   const isEmpty = notes.length === 0;
+
+  // Windowing: render the first chunk of cards and grow as the user scrolls,
+  // so a few hundred notes don't all mount at once. All filtering/sorting/counts
+  // operate on the full `notes` prop — only the rendered DOM is limited. Reset to
+  // the top chunk when the view (scope/filter/sort) changes, not on realtime data
+  // ticks, so live updates never collapse the list back.
+  const PAGE = 60;
+  const [visible, setVisible] = useState(PAGE);
+  useEffect(() => { setVisible(PAGE); }, [scope, activeChip, sort]);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || visible >= notes.length) return;
+    const io = new IntersectionObserver(
+      (entries) => { if (entries[0]?.isIntersecting) setVisible((v) => Math.min(v + PAGE, notes.length)); },
+      { rootMargin: '800px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visible, notes.length]);
+  const shown = visible >= notes.length ? notes : notes.slice(0, visible);
 
   return (
     <section className="cb-panel relative flex min-h-0 flex-col" style={{ borderRadius: 20 }}>
@@ -147,7 +168,7 @@ export const NoteList: React.FC<NoteListProps> = ({
           </div>
         ) : (
           <>
-            {notes.map((note) => (
+            {shown.map((note) => (
               <NoteCard
                 key={note.id}
                 note={note}
@@ -155,8 +176,9 @@ export const NoteList: React.FC<NoteListProps> = ({
                 onSelect={() => onSelect(note.id)}
               />
             ))}
+            {visible < notes.length && <div ref={sentinelRef} aria-hidden style={{ height: 1 }} />}
             <div className="font-mono" style={{ textAlign: 'center', padding: '14px 0 4px', fontSize: 10.5, color: 'var(--text-4)' }}>
-              — end of {notes.length} notes —
+              {visible < notes.length ? `— showing ${shown.length} of ${notes.length} notes —` : `— end of ${notes.length} notes —`}
             </div>
           </>
         )}

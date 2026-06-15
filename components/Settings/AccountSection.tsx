@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from '../../lib/router-compat';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../Toast';
 import { ConfirmDialog } from '../ConfirmDialog';

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/router';
+import { useRouter } from '../lib/router-compat';
 import type { Scope, FilterChip, Note } from '../lib/types';
 import { RUNBOOK_SPACE_NAMES } from '../lib/types';
 import { useApp } from './AppContext';

@@ -1,46 +1,31 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { serialize } from 'cookie';
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabase } from '../../../lib/supabase/server';
 
 // Sync the signed-in user's Microsoft 365 (Entra) directory profile into their
 // CheatBook profile. The client posts the Azure provider_token (only present on
 // the fresh OAuth session) right after an Entra sign-in. We call Microsoft Graph
 // server-side (no browser CORS):
 //   - GET /me            -> name (displayName), title (jobTitle), team_name (department)
-//   - GET /me/photo/$value -> avatar (uploaded to the public avatars bucket)
+//   - GET /me/photo/$value -> avatar (inlined as a base64 data URL)
 // Profile-field sync and photo sync are independent and BEST-EFFORT: a failure in
 // one never fails the other, and the route never 500s (errors are logged for ops).
-// The photo only (re)syncs when the avatar is empty or itself Entra-sourced
-// (`<uid>/entra.*`), so a manually uploaded avatar (`<uid>/avatar.*`) is preserved.
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: 'Method not allowed' });
+// The photo only (re)syncs when the avatar is empty or itself Entra-sourced, so a
+// manually uploaded avatar is preserved.
+export async function POST(req: NextRequest) {
+  let providerToken: unknown;
+  try {
+    providerToken = ((await req.json()) as { providerToken?: unknown })?.providerToken;
+  } catch {
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   }
-
-  const providerToken = (req.body as { providerToken?: unknown })?.providerToken;
   if (!providerToken || typeof providerToken !== 'string') {
-    return res.status(400).json({ error: 'Missing provider token' });
+    return NextResponse.json({ error: 'Missing provider token' }, { status: 400 });
   }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return Object.entries(req.cookies).map(([name, value]) => ({ name, value: value ?? '' }));
-        },
-        setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
-          res.setHeader('Set-Cookie', cookiesToSet.map(({ name, value, options }) => serialize(name, value, options)));
-        },
-      },
-    },
-  );
-
+  const supabase = await createServerSupabase();
   const { data: { user }, error: userErr } = await supabase.auth.getUser();
   if (userErr || !user) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const graph = (path: string) =>
@@ -70,17 +55,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // ── 2. Profile photo as a base64 data URL on the profile (best-effort) ────
-  // We inline the M365 thumbnail rather than uploading to the storage bucket: the
-  // server-side bucket upload was rejected (a MIME quirk) and the thumbnail is
-  // tiny. profiles.avatar accepts any string and renders as an <img src>. Only
-  // (re)sync when the avatar is empty or itself Entra-sourced (a data: URL), so a
-  // manually uploaded avatar (a storage URL) is preserved.
   try {
     const { data: profile } = await supabase.from('profiles').select('avatar').eq('id', user.id).maybeSingle();
     const current: string = profile?.avatar ?? '';
     const entraManaged = current === '' || current.startsWith('data:') || current.includes('/entra.');
     if (entraManaged) {
-      // A small thumbnail keeps the inlined value lean; fall back to the default photo.
       let photoRes = await graph('/me/photos/120x120/$value');
       if (!photoRes.ok) photoRes = await graph('/me/photo/$value');
       if (photoRes.ok) {
@@ -102,5 +81,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('[entra-sync] photo threw:', e);
   }
 
-  return res.status(200).json({ applied });
+  return NextResponse.json({ applied });
 }

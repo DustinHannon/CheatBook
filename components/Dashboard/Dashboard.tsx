@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from '../../lib/router-compat';
 import { useApp } from '../AppContext';
 import { usePresence } from '../PresenceContext';
 import { Avatar } from '../ui/Avatar';

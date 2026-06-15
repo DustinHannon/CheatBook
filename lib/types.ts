@@ -52,7 +52,7 @@ export interface Note {
   title: string;
   ownerId: string;
   collaboratorIds: string[];   // the note owner only (0-or-1 element; sharing was removed)
-  body: NoteBody;              // TipTap JSON
+  body: NoteBody | null;       // TipTap JSON — null in list rows (lazy-loaded on open via getNoteBody)
   snippet: string;            // derived preview text
   tags: string[];
   pinned: boolean;

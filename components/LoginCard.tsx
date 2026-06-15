@@ -1,5 +1,5 @@
 import React, { useState, useId } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from '../lib/router-compat';
 import { useAuth } from './AuthContext';
 
 /**

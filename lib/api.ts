@@ -161,8 +161,12 @@ export async function deleteSpace(supabase: DB, spaceId: string): Promise<void> 
 // browser; PostgREST still filters on it server-side in searchNotes regardless of
 // the projection. `body` stays (the editor seeds the Yjs doc from the in-memory
 // note.body). Drops ~35% off the notes-list payload.
+// `body` (the TipTap JSONB, ~697 kB across all notes) is intentionally NOT in the
+// list projection — nothing in the list/cards/dashboard renders it. The editor
+// lazy-fetches a single note's body on open via getNoteBody(). `has_image` is the
+// denormalized flag that lets the cards show an image indicator without `body`.
 const NOTE_SELECT =
-  'id,notebook_id,title,owner_id,body,snippet,tags,is_pinned,is_locked,locked_by,last_edited_by,created_at,updated_at,stale_since, notebooks(id,title,color), owner:owner_id(name), editor:last_edited_by(name), note_attachments(count)';
+  'id,notebook_id,title,owner_id,snippet,tags,is_pinned,is_locked,locked_by,last_edited_by,created_at,updated_at,stale_since,has_image, notebooks(id,title,color), owner:owner_id(name), editor:last_edited_by(name), note_attachments(count)';
 
 // Coerce a stored note body into a valid TipTap doc. Guards against the column
 // default ('[]' array), legacy HTML strings, and malformed jsonb so the editor
@@ -185,12 +189,13 @@ function mapNote(row: any, starredIds: Set<string>): Note {
     title: row.title,
     ownerId: row.owner_id,
     collaboratorIds,
-    body: normalizeBody(row.body),
-    snippet: row.snippet || snippetFromDoc(row.body) || '',
+    // The list query omits `body`; it's lazy-loaded on open (getNoteBody).
+    body: null,
+    snippet: row.snippet || '',
     tags: row.tags || [],
     pinned: !!row.is_pinned,
     starredByMe: starredIds.has(row.id),
-    hasImage: docHasImage(row.body),
+    hasImage: !!row.has_image,
     attachmentCount: row.note_attachments?.[0]?.count ?? 0,
     isLocked: !!row.is_locked,
     lockedBy: row.locked_by ?? null,
@@ -220,6 +225,15 @@ export async function getNotes(supabase: DB): Promise<Note[]> {
   ]);
   if (error) throw error;
   return (data || []).map((n: any) => mapNote(n, starred));
+}
+
+// Lazy-fetch a single note's body. The list query (NOTE_SELECT) omits `body` to
+// keep the payload small; the editor pulls the real body here when a note opens,
+// BEFORE the Yjs seeding gate runs, so seeding is never starved of content.
+export async function getNoteBody(supabase: DB, noteId: string): Promise<Json> {
+  const { data, error } = await supabase.from('notes').select('body').eq('id', noteId).single();
+  if (error) throw error;
+  return normalizeBody(data.body);
 }
 
 export async function createNote(supabase: DB, spaceId: string, title = 'Untitled note'): Promise<Note> {
@@ -253,6 +267,7 @@ export async function saveNoteSnapshot(supabase: DB, noteId: string, body: Json,
     body,
     snippet: snippetFromDoc(body),
     content: docToText(body),
+    has_image: docHasImage(body),
     last_edited_by: user.id,
   };
   if (title !== undefined) payload.title = title;
@@ -280,6 +295,7 @@ export async function duplicateNote(supabase: DB, noteId: string): Promise<Note>
       tags: src.tags,
       snippet: src.snippet,
       content: src.content,
+      has_image: src.has_image ?? false,
     })
     .select(NOTE_SELECT).single();
   if (error) throw error;

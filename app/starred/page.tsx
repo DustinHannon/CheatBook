@@ -1,13 +1,13 @@
-import React from 'react';
+'use client';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { Layout } from '../../components/Layout';
 import { Workspace } from '../../components/Workspace';
 
-export default function NotesPage() {
+export default function StarredPage() {
   return (
     <ProtectedRoute>
       <Layout>
-        <Workspace scope="all" />
+        <Workspace scope="starred" />
       </Layout>
     </ProtectedRoute>
   );

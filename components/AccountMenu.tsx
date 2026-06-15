@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from '../lib/router-compat';
 import { useApp } from './AppContext';
 import { useAuth } from './AuthContext';
 import { Avatar } from './ui/Avatar';
