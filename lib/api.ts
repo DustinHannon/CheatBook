@@ -11,9 +11,25 @@ import type { Json } from './database.types';
 type DB = SupabaseClient;
 
 // ─── Auth helper ──────────────────────────────────────────────────────
+// Cache the last JWT we signature-verified so the hot path (list loads, the 2s
+// autosave) doesn't re-validate the same token every call. RLS still re-checks
+// auth.uid() server-side on every query, so identity here only sets owner_id /
+// filters — but we verify the token rather than trusting the local session decode.
+let _validatedToken: string | null = null;
+
 async function getCurrentUser(supabase: DB) {
   const { data: { session } } = await supabase.auth.getSession();
-  if (session?.user) return session.user;
+  const token = session?.access_token ?? null;
+  if (session?.user && token) {
+    if (_validatedToken === token) return session.user;
+    // getClaims = local signature verify for asymmetric keys, getUser() fallback
+    // for HS256 — either way a real verification, not a blind decode.
+    const { data, error } = await supabase.auth.getClaims(token);
+    if (!error && data?.claims?.sub === session.user.id) {
+      _validatedToken = token;
+      return session.user;
+    }
+  }
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
   return user;
@@ -41,11 +57,17 @@ function mapMember(p: any, role = 'member'): Member {
 }
 
 // All approved profiles — drives presence/avatars. RLS lets any approved user
-// read all approved profiles; no team scoping anymore.
+// read all approved profiles; no team scoping anymore. Explicit projection (not
+// '*') so we don't ship colleagues' private settings (last_login,
+// notification_prefs, appearance) to every other browser — only what mapMember
+// and the member/roster UI actually render.
+const MEMBER_SELECT =
+  'id,email,name,username,avatar,title,pronouns,team_name,status,color,approved,is_admin,created_at';
+
 export async function getMembers(supabase: DB): Promise<Member[]> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select(MEMBER_SELECT)
     .eq('approved', true)
     .order('created_at', { ascending: true });
   if (error) throw error;
@@ -375,6 +397,23 @@ export function safeFileHref(url: string | null | undefined): string {
   return '#';
 }
 
+// Guard a profile avatar before it is rendered as <img src>. profiles.avatar is
+// self-writable (updateProfile / Entra sync), so only allow the shapes we produce:
+// a data:image/* URL (Entra photo), the same-origin /api/file proxy, or an object
+// on the Supabase storage host (public avatars / signed image URLs). Anything else
+// (e.g. an attacker-controlled external URL used as a tracking beacon, or a
+// javascript: scheme) returns null so the caller falls back to initials.
+export function safeAvatarSrc(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (/^data:image\/(?:png|jpe?g|gif|webp);/i.test(url)) return url;
+  if (url.startsWith('/api/file?')) return url;
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'https:' && /(^|\.)supabase\.co$/i.test(u.hostname)) return url;
+  } catch { /* not an absolute URL */ }
+  return null;
+}
+
 // Recover the raw storage object path from a proxy url produced by fileUrl().
 function storagePathFromUrl(url: string | null | undefined): string | null {
   if (!url) return null;
@@ -473,7 +512,15 @@ export async function updateProfile(supabase: DB, updates: {
   name?: string; title?: string; pronouns?: string; team_name?: string; status?: string; color?: string; avatar?: string;
 }): Promise<void> {
   const user = await getCurrentUser(supabase);
-  const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
+  // Forward only an explicit allow-list of editable columns — never a raw object —
+  // so a future caller can't smuggle a privileged/unexpected column into the write.
+  // (approved/is_admin are already blocked by column grants + the profiles_guard
+  // trigger; this keeps the app layer honest too.)
+  const ALLOWED = ['name', 'title', 'pronouns', 'team_name', 'status', 'color', 'avatar'] as const;
+  const payload: Record<string, unknown> = {};
+  for (const k of ALLOWED) if (updates[k] !== undefined) payload[k] = updates[k];
+  if (Object.keys(payload).length === 0) return;
+  const { error } = await supabase.from('profiles').update(payload).eq('id', user.id);
   if (error) throw error;
 }
 

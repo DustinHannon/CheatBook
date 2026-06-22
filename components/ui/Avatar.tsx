@@ -1,5 +1,6 @@
 import React from 'react';
 import { avatarTokens, initials as toInitials } from '../../lib/colors';
+import { safeAvatarSrc } from '../../lib/api';
 
 interface AvatarProps {
   name?: string | null;
@@ -18,12 +19,15 @@ export const Avatar: React.FC<AvatarProps> = ({
   const t = avatarTokens(color);
   const fontSize = Math.max(9, Math.round(size * 0.36));
   const pip = Math.max(8, Math.round(size * 0.33));
+  // Render-boundary guard: only trust avatar URLs of a known-safe shape, else
+  // fall back to initials (blocks attacker-controlled external-beacon img src).
+  const src = safeAvatarSrc(avatarUrl);
   return (
     <div className={`relative flex-none ${className}`} style={{ width: size, height: size }}>
-      {avatarUrl ? (
+      {src ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={avatarUrl}
+          src={src}
           alt={name || ''}
           className="h-full w-full rounded-full object-cover"
           style={ring ? { boxShadow: `0 0 0 2px ${t.ring}` } : undefined}

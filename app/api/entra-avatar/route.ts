@@ -28,6 +28,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Binary platform access: only approved users may sync their directory profile
+  // (and thereby drive outbound Microsoft Graph traffic). Mirrors /api/file's gate.
+  const { data: gate, error: gateErr } = await supabase
+    .from('profiles').select('approved').eq('id', user.id).single();
+  if (gateErr || !gate?.approved) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const graph = (path: string) =>
     fetch(`https://graph.microsoft.com/v1.0${path}`, { headers: { Authorization: `Bearer ${providerToken}` } });
 
@@ -48,7 +56,9 @@ export async function POST(req: NextRequest) {
         else applied.push(...Object.keys(upd));
       }
     } else {
-      console.error('[entra-sync] Graph /me failed:', meRes.status, await meRes.text());
+      // Status only — Graph error bodies carry directory IDs / AADSTS trace IDs
+      // we don't want sitting in persistent server logs.
+      console.error('[entra-sync] Graph /me failed:', meRes.status);
     }
   } catch (e) {
     console.error('[entra-sync] Graph /me threw:', e);
@@ -74,7 +84,7 @@ export async function POST(req: NextRequest) {
           console.error('[entra-sync] photo empty or too large:', buf.byteLength);
         }
       } else if (photoRes.status !== 404) {
-        console.error('[entra-sync] Graph photo failed:', photoRes.status, await photoRes.text());
+        console.error('[entra-sync] Graph photo failed:', photoRes.status);
       }
     }
   } catch (e) {

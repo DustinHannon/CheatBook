@@ -21,7 +21,12 @@ export const PresenceProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     if (!user) { setOnlineIds(new Set()); return; }
 
-    const channel = supabase.channel(LOBBY, { config: { presence: { key: user.id } } });
+    // Private channel: realtime.messages RLS (cb_realtime_*_approved) gates join +
+    // track to approved users, so the online roster (ids/names/login times) isn't
+    // harvestable by anyone holding the public anon key. setAuth() ensures the
+    // realtime socket carries the current auth JWT for the join.
+    void supabase.realtime.setAuth();
+    const channel = supabase.channel(LOBBY, { config: { private: true, presence: { key: user.id } } });
 
     const sync = () => {
       const state = channel.presenceState() as Record<string, { id?: string }[]>;

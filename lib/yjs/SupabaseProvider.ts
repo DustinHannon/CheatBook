@@ -55,7 +55,13 @@ export class SupabaseYjsProvider {
     this.awareness.on('update', this.onAwarenessUpdate);
     if (typeof window !== 'undefined') window.addEventListener('beforeunload', this.onUnload);
 
-    this.channel = supabase.channel(`cb-note:${noteId}`, { config: { broadcast: { self: false, ack: false } } });
+    // Private channel: realtime.messages RLS (cb_realtime_*_approved) restricts
+    // join/broadcast on cb-note:<id> to approved users, so live/full note content
+    // can no longer be pulled by anyone holding the public anon key + a note UUID.
+    // supabase-js propagates the auth JWT to the realtime socket on sign-in; the
+    // setAuth() call guarantees the token is current for this channel's join.
+    this.channel = supabase.channel(`cb-note:${noteId}`, { config: { private: true, broadcast: { self: false, ack: false } } });
+    void this.supabase.realtime.setAuth();
     this.connect();
   }
 
