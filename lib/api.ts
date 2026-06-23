@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   Space, Member, Note, Attachment, ActivityEvent,
   NotificationPrefs, Appearance, UserAccount,
+  PortalCategory, PortalLink,
 } from './types';
 import { initials, colorForId } from './colors';
 import { snippetFromDoc, docToText, docHasImage, emptyDoc, legacyToDoc } from './blocks';
@@ -607,4 +608,130 @@ export async function removeAvatar(supabase: DB): Promise<void> {
   }
   const { error } = await supabase.from('profiles').update({ avatar: null }).eq('id', user.id);
   if (error) throw error;
+}
+
+// ─── Portals (admin-curated link directory) ───────────────────────────
+// Categories + their link cards. RLS: every approved user reads; only admins
+// (is_app_admin) write — the Portals UI hides admin controls for non-admins, but
+// the DB is the real boundary (a direct PostgREST write from a non-admin fails).
+function mapPortalLink(l: any): PortalLink {
+  return {
+    id: l.id,
+    categoryId: l.category_id,
+    label: l.label,
+    url: l.url,
+    description: l.description ?? null,
+    icon: l.icon || 'globe',
+    color: l.color || '#6ea8fe',
+    sortOrder: l.sort_order ?? 0,
+  };
+}
+
+export async function getPortals(supabase: DB): Promise<PortalCategory[]> {
+  const { data, error } = await supabase
+    .from('portal_categories')
+    .select('*, portal_links(*)')
+    .order('sort_order', { ascending: true })
+    .order('sort_order', { referencedTable: 'portal_links', ascending: true });
+  if (error) throw error;
+  return (data || []).map((c: any): PortalCategory => ({
+    id: c.id,
+    name: c.name,
+    color: c.color || '#6ea8fe',
+    icon: c.icon || 'folder',
+    sortOrder: c.sort_order ?? 0,
+    // Defensive client-side sort in case the nested order isn't applied.
+    links: (c.portal_links || [])
+      .map(mapPortalLink)
+      .sort((a: PortalLink, b: PortalLink) => a.sortOrder - b.sortOrder),
+  }));
+}
+
+export async function createPortalCategory(
+  supabase: DB, input: { name: string; color?: string; icon?: string },
+): Promise<PortalCategory> {
+  const user = await getCurrentUser(supabase);
+  const { data: last } = await supabase
+    .from('portal_categories').select('sort_order')
+    .order('sort_order', { ascending: false }).limit(1).maybeSingle();
+  const sortOrder = (last?.sort_order ?? 0) + 1;
+  const { data, error } = await supabase.from('portal_categories').insert({
+    name: input.name, color: input.color ?? '#6ea8fe', icon: input.icon ?? 'folder',
+    sort_order: sortOrder, created_by: user.id,
+  }).select().single();
+  if (error) throw error;
+  return { id: data.id, name: data.name, color: data.color, icon: data.icon, sortOrder: data.sort_order, links: [] };
+}
+
+export async function updatePortalCategory(
+  supabase: DB, id: string, updates: { name?: string; color?: string; icon?: string },
+): Promise<void> {
+  const payload: Record<string, unknown> = {};
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.color !== undefined) payload.color = updates.color;
+  if (updates.icon !== undefined) payload.icon = updates.icon;
+  if (Object.keys(payload).length === 0) return;
+  const { error } = await supabase.from('portal_categories').update(payload).eq('id', id);
+  if (error) throw error;
+}
+
+// Deleting a category cascades to its links (FK ON DELETE CASCADE).
+export async function deletePortalCategory(supabase: DB, id: string): Promise<void> {
+  const { error } = await supabase.from('portal_categories').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function reorderPortalCategories(supabase: DB, orderedIds: string[]): Promise<void> {
+  const results = await Promise.all(
+    orderedIds.map((id, i) => supabase.from('portal_categories').update({ sort_order: i }).eq('id', id)),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw failed.error;
+}
+
+export async function createPortalLink(
+  supabase: DB,
+  input: { categoryId: string; label: string; url: string; description?: string | null; icon?: string; color?: string },
+): Promise<PortalLink> {
+  const user = await getCurrentUser(supabase);
+  const { data: last } = await supabase
+    .from('portal_links').select('sort_order').eq('category_id', input.categoryId)
+    .order('sort_order', { ascending: false }).limit(1).maybeSingle();
+  const sortOrder = (last?.sort_order ?? 0) + 1;
+  const { data, error } = await supabase.from('portal_links').insert({
+    category_id: input.categoryId, label: input.label, url: input.url,
+    description: input.description ?? null, icon: input.icon ?? 'globe',
+    color: input.color ?? '#6ea8fe', sort_order: sortOrder, created_by: user.id,
+  }).select().single();
+  if (error) throw error;
+  return mapPortalLink(data);
+}
+
+export async function updatePortalLink(
+  supabase: DB, id: string,
+  updates: { label?: string; url?: string; description?: string | null; icon?: string; color?: string; categoryId?: string },
+): Promise<void> {
+  const payload: Record<string, unknown> = {};
+  if (updates.label !== undefined) payload.label = updates.label;
+  if (updates.url !== undefined) payload.url = updates.url;
+  if (updates.description !== undefined) payload.description = updates.description;
+  if (updates.icon !== undefined) payload.icon = updates.icon;
+  if (updates.color !== undefined) payload.color = updates.color;
+  if (updates.categoryId !== undefined) payload.category_id = updates.categoryId;
+  if (Object.keys(payload).length === 0) return;
+  const { error } = await supabase.from('portal_links').update(payload).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deletePortalLink(supabase: DB, id: string): Promise<void> {
+  const { error } = await supabase.from('portal_links').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function reorderPortalLinks(supabase: DB, orderedIds: string[]): Promise<void> {
+  const results = await Promise.all(
+    orderedIds.map((id, i) => supabase.from('portal_links').update({ sort_order: i }).eq('id', id)),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw failed.error;
 }

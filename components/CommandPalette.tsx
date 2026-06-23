@@ -33,6 +33,7 @@ const PATH_NEW = 'M12 5v14M5 12h14';
 const PATH_DASHBOARD = 'M3 11l9-7 9 7M5 10v9h14v-9';
 const PATH_UPLOAD = 'M12 3v12M7 8l5-5 5 5M5 21h14';
 const PATH_SPACE = 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z';
+const PATH_PORTALS = 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z';
 
 interface ActionDef {
   id: string;
@@ -148,6 +149,11 @@ export const CommandPalette: React.FC = () => {
     router.push('/');
   }, [closePalette, router]);
 
+  const runPortals = useCallback(() => {
+    closePalette();
+    router.push('/portals');
+  }, [closePalette, router]);
+
   const runUpload = useCallback(() => {
     closePalette();
     if (!targetNoteId) { showToast('Create a note first to upload an image.', 'info'); return; }
@@ -160,8 +166,9 @@ export const CommandPalette: React.FC = () => {
     // only admins get the create-space action.
     ...(isAdmin ? [{ id: 'space', label: 'Create a space', pathD: PATH_SPACE, run: runCreateSpace }] : []),
     { id: 'dashboard', label: 'Go to Dashboard', pathD: PATH_DASHBOARD, run: runDashboard },
+    { id: 'portals', label: 'Go to Portals', pathD: PATH_PORTALS, run: runPortals },
     { id: 'upload', label: 'Upload an image to this note', pathD: PATH_UPLOAD, run: runUpload },
-  ], [isAdmin, runCreateNote, runCreateSpace, runDashboard, runUpload]);
+  ], [isAdmin, runCreateNote, runCreateSpace, runDashboard, runPortals, runUpload]);
 
   // Quick actions filtered by label (mirrors reference logic).
   const actionHits = useMemo<ActionDef[]>(

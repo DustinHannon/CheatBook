@@ -4,15 +4,16 @@ import { createClient } from '../lib/supabase/client';
 import { useAuth } from './AuthContext';
 import { useToast } from './Toast';
 import { updateAppearance } from '../lib/api';
-import type { Appearance, Density, Theme } from '../lib/types';
+import type { Appearance, Density, Theme, PortalDensity } from '../lib/types';
 
-const DEFAULT: Appearance = { accent: '#6ea8fe', density: 'balanced', theme: 'dark' };
+const DEFAULT: Appearance = { accent: '#6ea8fe', density: 'balanced', theme: 'dark', portalDensity: 'comfortable' };
 
 type AppearanceContextType = {
   appearance: Appearance;
   setAccent: (accent: string) => void;
   setDensity: (density: Density) => void;
   setTheme: (theme: Theme) => void;
+  setPortalDensity: (portalDensity: PortalDensity) => void;
 };
 
 const AppearanceContext = createContext<AppearanceContextType>({
@@ -20,6 +21,7 @@ const AppearanceContext = createContext<AppearanceContextType>({
   setAccent: () => {},
   setDensity: () => {},
   setTheme: () => {},
+  setPortalDensity: () => {},
 });
 
 const supabase = createClient();
@@ -57,6 +59,7 @@ export const AppearanceProvider: React.FC<{ children: ReactNode }> = ({ children
         accent: a.accent || DEFAULT.accent,
         density: a.density || DEFAULT.density,
         theme: a.theme || DEFAULT.theme,
+        portalDensity: a.portalDensity || DEFAULT.portalDensity,
       });
     });
     return () => { cancelled = true; };
@@ -87,9 +90,10 @@ export const AppearanceProvider: React.FC<{ children: ReactNode }> = ({ children
   const setAccent = useCallback((accent: string) => persist({ ...appearanceRef.current, accent }), [persist]);
   const setDensity = useCallback((density: Density) => persist({ ...appearanceRef.current, density }), [persist]);
   const setTheme = useCallback((theme: Theme) => persist({ ...appearanceRef.current, theme }), [persist]);
+  const setPortalDensity = useCallback((portalDensity: PortalDensity) => persist({ ...appearanceRef.current, portalDensity }), [persist]);
 
   return (
-    <AppearanceContext.Provider value={{ appearance, setAccent, setDensity, setTheme }}>
+    <AppearanceContext.Provider value={{ appearance, setAccent, setDensity, setTheme, setPortalDensity }}>
       {children}
     </AppearanceContext.Provider>
   );

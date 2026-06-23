@@ -84,6 +84,29 @@ export interface Attachment {
   uploadedAt: string;
 }
 
+// ─── Portals (admin-curated link directory) ───
+// A category groups link cards; both carry a color + lucide icon name. Admins
+// write (RLS: is_app_admin), every approved user reads.
+export interface PortalLink {
+  id: string;
+  categoryId: string;
+  label: string;
+  url: string;
+  description: string | null;
+  icon: string;   // lucide icon name (see lib/portal-icons)
+  color: string;  // hex
+  sortOrder: number;
+}
+
+export interface PortalCategory {
+  id: string;
+  name: string;
+  color: string;  // hex
+  icon: string;   // lucide icon name
+  sortOrder: number;
+  links: PortalLink[];
+}
+
 export interface ActivityEvent {
   id: string;
   actorId: string | null;
@@ -99,6 +122,8 @@ export type Scope = 'all' | 'starred';
 export type FilterChip = 'all' | 'pinned' | 'starred' | 'runbooks';
 export type Density = 'compact' | 'balanced' | 'spacious';
 export type Theme = 'dark' | 'light';
+// Portals page card density (viewer preference, persisted in Appearance).
+export type PortalDensity = 'compact' | 'comfortable';
 
 export interface NotificationPrefs {
   mentions: boolean;
@@ -113,6 +138,7 @@ export interface Appearance {
   accent: string;
   density: Density;
   theme: Theme;
+  portalDensity?: PortalDensity;  // Portals page card density; defaults to 'comfortable'
 }
 
 // Spaces whose notes count as "Runbooks" for the saved filter chip (data-driven,
